@@ -174,76 +174,51 @@ export const users: User[] = [
 ]
 
 export type RolePermission = {
-  id: string
-  name: string
+  role: string
   description: string
-  administrator: boolean
-  claimProcessor: boolean
+  permissions: {
+    viewClaims: boolean
+    createClaims: boolean
+    editClaims: boolean
+    submitClaims: boolean
+    manageClients: boolean
+    viewAuditLog: boolean
+    manageUsers: boolean
+    manageTemplates: boolean
+    accessInvoicing: boolean
+  }
 }
 
 export const rolePermissions: RolePermission[] = [
   {
-    id: "p1",
-    name: "View Claims",
-    description: "Access and view all claim packs",
-    administrator: true,
-    claimProcessor: true,
+    role: "Administrator",
+    description: "Full access to all features including user management, submissions, and settings.",
+    permissions: {
+      viewClaims: true,
+      createClaims: true,
+      editClaims: true,
+      submitClaims: true,
+      manageClients: true,
+      viewAuditLog: true,
+      manageUsers: true,
+      manageTemplates: true,
+      accessInvoicing: true,
+    },
   },
   {
-    id: "p2",
-    name: "Create Claims",
-    description: "Create new claim packs for clients",
-    administrator: true,
-    claimProcessor: true,
-  },
-  {
-    id: "p3",
-    name: "Edit Claims",
-    description: "Modify existing claim pack data",
-    administrator: true,
-    claimProcessor: true,
-  },
-  {
-    id: "p4",
-    name: "Submit Claims",
-    description: "Finalise and submit claims to HMRC",
-    administrator: true,
-    claimProcessor: false,
-  },
-  {
-    id: "p5",
-    name: "Manage Clients",
-    description: "Add, edit, or archive client records",
-    administrator: true,
-    claimProcessor: false,
-  },
-  {
-    id: "p6",
-    name: "View Audit Log",
-    description: "Access the full audit trail",
-    administrator: true,
-    claimProcessor: false,
-  },
-  {
-    id: "p7",
-    name: "Manage Users",
-    description: "Invite, edit, or deactivate users",
-    administrator: true,
-    claimProcessor: false,
-  },
-  {
-    id: "p8",
-    name: "Manage Templates",
-    description: "Create and edit document templates",
-    administrator: true,
-    claimProcessor: false,
-  },
-  {
-    id: "p9",
-    name: "Access Invoicing",
-    description: "View and manage billing records",
-    administrator: true,
-    claimProcessor: false,
+    role: "Claim Processor",
+    description: "Can view and edit claims, upload documents, and build CT600s. Cannot submit or manage users.",
+    permissions: {
+      viewClaims: true,
+      createClaims: true,
+      editClaims: true,
+      submitClaims: false,
+      manageClients: false,
+      viewAuditLog: false,
+      manageUsers: false,
+      manageTemplates: false,
+      accessInvoicing: false,
+    },
   },
 ]
 

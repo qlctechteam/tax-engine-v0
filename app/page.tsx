@@ -2288,11 +2288,11 @@ function ClaimsView({
                 
                 <div className="space-y-2">
                   {yearEnds.map((ye) => (
-                    <button
+                    <div
                       key={ye.id}
                       onClick={() => handleSelectYearEnd(ye)}
                       className={cn(
-                        "w-full flex items-center justify-between p-4 rounded-lg border text-left transition-colors",
+                        "w-full flex items-center justify-between p-4 rounded-lg border text-left transition-colors cursor-pointer",
                         selectedYearEnd?.id === ye.id
                           ? "border-primary bg-primary/5"
                           : "border-border hover:border-primary/50 hover:bg-muted/50"
@@ -2315,7 +2315,7 @@ function ClaimsView({
                           Process Claim
                         </Button>
                       )}
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>
