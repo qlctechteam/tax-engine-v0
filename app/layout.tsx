@@ -3,6 +3,9 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
+import { AuthProvider } from '@/providers/auth-provider'
+import { AppProvider } from '@/providers/app-provider'
+import { AppShell } from '@/components/layout'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -46,7 +49,13 @@ export default function RootLayout({
           disableTransitionOnChange
           storageKey="taxengine-theme"
         >
-          {children}
+          <AuthProvider>
+            <AppProvider>
+              <AppShell>
+                {children}
+              </AppShell>
+            </AppProvider>
+          </AuthProvider>
         </ThemeProvider>
         <Analytics />
       </body>

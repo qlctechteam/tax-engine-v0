@@ -26,6 +26,20 @@ export type Submission = {
   packRef: string
 }
 
+// Accounting Period type - represents a financial year end for a company
+export type AccountingPeriod = {
+  id: string
+  companyId: string
+  yearEnd: string // e.g., "Mar 2024", "Dec 2023"
+  yearEndDate: string // Full date e.g., "31 Mar 2024"
+  periodStart: string // e.g., "01 Apr 2023"
+  periodEnd: string // e.g., "31 Mar 2024"
+  status: "In Progress" | "Proofing" | "Signed" | "Issued" | "Submitted"
+  processedBy?: string
+  amount?: string
+  claimId?: string // Link to claim if one exists
+}
+
 export const companies: Company[] = [
   { id: "c1", name: "Alpha Robotics Ltd", number: "11223344", utr: "1234567890", contactName: "John Smith", contactEmail: "john@alpharobotics.com", contactPhone: "07700 900123" },
   { id: "c2", name: "Beacon Analytics Ltd", number: "22114455", utr: "2345678901", payeReference: "123/AB456", contactName: "Sarah Jones", contactEmail: "sarah@beaconanalytics.com", contactPhone: "07700 900456" },
@@ -92,6 +106,256 @@ export const submissionsByCompany: Record<string, Submission[]> = {
       packRef: "-",
     },
   ],
+}
+
+// Accounting periods by company - each company can have multiple accounting periods
+export const accountingPeriodsByCompany: Record<string, AccountingPeriod[]> = {
+  // Alpha Robotics Ltd - March year end
+  c1: [
+    {
+      id: "ap1-1",
+      companyId: "c1",
+      yearEnd: "Mar 2025",
+      yearEndDate: "31 Mar 2025",
+      periodStart: "01 Apr 2024",
+      periodEnd: "31 Mar 2025",
+      status: "In Progress",
+      processedBy: "Sarah Chen",
+      amount: "TBD",
+    },
+    {
+      id: "ap1-2",
+      companyId: "c1",
+      yearEnd: "Mar 2024",
+      yearEndDate: "31 Mar 2024",
+      periodStart: "01 Apr 2023",
+      periodEnd: "31 Mar 2024",
+      status: "Issued",
+      processedBy: "Sarah Chen",
+      amount: "£42,350",
+    },
+    {
+      id: "ap1-3",
+      companyId: "c1",
+      yearEnd: "Mar 2023",
+      yearEndDate: "31 Mar 2023",
+      periodStart: "01 Apr 2022",
+      periodEnd: "31 Mar 2023",
+      status: "Submitted",
+      processedBy: "James Wilson",
+      amount: "£38,200",
+    },
+  ],
+  // Beacon Analytics Ltd - December year end
+  c2: [
+    {
+      id: "ap2-1",
+      companyId: "c2",
+      yearEnd: "Dec 2024",
+      yearEndDate: "31 Dec 2024",
+      periodStart: "01 Jan 2024",
+      periodEnd: "31 Dec 2024",
+      status: "Proofing",
+      processedBy: "Sarah Chen",
+      amount: "£29,800",
+    },
+    {
+      id: "ap2-2",
+      companyId: "c2",
+      yearEnd: "Dec 2023",
+      yearEndDate: "31 Dec 2023",
+      periodStart: "01 Jan 2023",
+      periodEnd: "31 Dec 2023",
+      status: "Signed",
+      processedBy: "James Wilson",
+      amount: "£31,450",
+    },
+    {
+      id: "ap2-3",
+      companyId: "c2",
+      yearEnd: "Dec 2022",
+      yearEndDate: "31 Dec 2022",
+      periodStart: "01 Jan 2022",
+      periodEnd: "31 Dec 2022",
+      status: "Submitted",
+      processedBy: "Emily Chen",
+      amount: "£27,900",
+    },
+  ],
+  // Cobalt Systems Ltd - September year end
+  c3: [
+    {
+      id: "ap3-1",
+      companyId: "c3",
+      yearEnd: "Sep 2024",
+      yearEndDate: "30 Sep 2024",
+      periodStart: "01 Oct 2023",
+      periodEnd: "30 Sep 2024",
+      status: "Issued",
+      processedBy: "Alex Kumar",
+      amount: "£56,720",
+    },
+    {
+      id: "ap3-2",
+      companyId: "c3",
+      yearEnd: "Sep 2023",
+      yearEndDate: "30 Sep 2023",
+      periodStart: "01 Oct 2022",
+      periodEnd: "30 Sep 2023",
+      status: "Submitted",
+      processedBy: "Sarah Chen",
+      amount: "£48,350",
+    },
+  ],
+  // QLC Consulting Ltd - June year end
+  c4: [
+    {
+      id: "ap4-1",
+      companyId: "c4",
+      yearEnd: "Jun 2025",
+      yearEndDate: "30 Jun 2025",
+      periodStart: "01 Jul 2024",
+      periodEnd: "30 Jun 2025",
+      status: "In Progress",
+      processedBy: "Emily Chen",
+      amount: "TBD",
+      claimId: "cl3",
+    },
+    {
+      id: "ap4-2",
+      companyId: "c4",
+      yearEnd: "Jun 2024",
+      yearEndDate: "30 Jun 2024",
+      periodStart: "01 Jul 2023",
+      periodEnd: "30 Jun 2024",
+      status: "Issued",
+      processedBy: "Alex Kumar",
+      amount: "£33,150",
+    },
+    {
+      id: "ap4-3",
+      companyId: "c4",
+      yearEnd: "Jun 2023",
+      yearEndDate: "30 Jun 2023",
+      periodStart: "01 Jul 2022",
+      periodEnd: "30 Jun 2023",
+      status: "Submitted",
+      processedBy: "James Wilson",
+      amount: "£29,750",
+    },
+  ],
+  // Romilly & Co Ltd - March year end
+  c5: [
+    {
+      id: "ap5-1",
+      companyId: "c5",
+      yearEnd: "Mar 2025",
+      yearEndDate: "31 Mar 2025",
+      periodStart: "01 Apr 2024",
+      periodEnd: "31 Mar 2025",
+      status: "In Progress",
+      processedBy: "James Harrison",
+      amount: "TBD",
+      claimId: "cl1",
+    },
+    {
+      id: "ap5-2",
+      companyId: "c5",
+      yearEnd: "Mar 2024",
+      yearEndDate: "31 Mar 2024",
+      periodStart: "01 Apr 2023",
+      periodEnd: "31 Mar 2024",
+      status: "Signed",
+      processedBy: "James Wilson",
+      amount: "£45,230",
+      claimId: "cl2",
+    },
+    {
+      id: "ap5-3",
+      companyId: "c5",
+      yearEnd: "Mar 2023",
+      yearEndDate: "31 Mar 2023",
+      periodStart: "01 Apr 2022",
+      periodEnd: "31 Mar 2023",
+      status: "Submitted",
+      processedBy: "Sarah Chen",
+      amount: "£38,500",
+    },
+    {
+      id: "ap5-4",
+      companyId: "c5",
+      yearEnd: "Mar 2022",
+      yearEndDate: "31 Mar 2022",
+      periodStart: "01 Apr 2021",
+      periodEnd: "31 Mar 2022",
+      status: "Submitted",
+      processedBy: "Emily Chen",
+      amount: "£32,100",
+    },
+  ],
+  // Zeta Materials Ltd - December year end
+  c6: [
+    {
+      id: "ap6-1",
+      companyId: "c6",
+      yearEnd: "Dec 2024",
+      yearEndDate: "31 Dec 2024",
+      periodStart: "01 Jan 2024",
+      periodEnd: "31 Dec 2024",
+      status: "Proofing",
+      processedBy: "Sarah Chen",
+      amount: "£67,400",
+    },
+    {
+      id: "ap6-2",
+      companyId: "c6",
+      yearEnd: "Dec 2023",
+      yearEndDate: "31 Dec 2023",
+      periodStart: "01 Jan 2023",
+      periodEnd: "31 Dec 2023",
+      status: "Issued",
+      processedBy: "Alex Kumar",
+      amount: "£58,900",
+    },
+    {
+      id: "ap6-3",
+      companyId: "c6",
+      yearEnd: "Dec 2022",
+      yearEndDate: "31 Dec 2022",
+      periodStart: "01 Jan 2022",
+      periodEnd: "31 Dec 2022",
+      status: "Submitted",
+      processedBy: "James Wilson",
+      amount: "£52,150",
+    },
+  ],
+}
+
+// Helper function to get all accounting periods across all companies
+export function getAllAccountingPeriods(): (AccountingPeriod & { companyName: string })[] {
+  const allPeriods: (AccountingPeriod & { companyName: string })[] = []
+  
+  for (const company of companies) {
+    const periods = accountingPeriodsByCompany[company.id] || []
+    for (const period of periods) {
+      allPeriods.push({
+        ...period,
+        companyName: company.name,
+      })
+    }
+  }
+  
+  // Sort by year end date (most recent first)
+  return allPeriods.sort((a, b) => {
+    const dateA = new Date(a.yearEndDate.split(' ').reverse().join(' '))
+    const dateB = new Date(b.yearEndDate.split(' ').reverse().join(' '))
+    return dateB.getTime() - dateA.getTime()
+  })
+}
+
+// Helper function to get recent claims (accounting periods that are not submitted)
+export function getRecentClaims(): (AccountingPeriod & { companyName: string })[] {
+  return getAllAccountingPeriods().filter(p => p.status !== "Submitted")
 }
 
 export const stages = [
@@ -355,5 +619,50 @@ export const templates: Template[] = [
     category: "letter",
     lastModified: "20 Jan 2026",
     version: "1.4.0",
+  },
+]
+
+// Government Gateway Credentials
+export type GatewayCredentials = {
+  agentUserId: string
+  password: string // In production, this would be securely stored/encrypted
+  status: "connected" | "disconnected" | "expired"
+  lastVerified: string
+  connectedAt: string
+}
+
+export type SubmissionPermission = {
+  id: string
+  name: string
+  description: string
+  authorised: boolean
+}
+
+export const governmentGateway: GatewayCredentials = {
+  agentUserId: "AGENT-12345-67890",
+  password: "••••••••••••", // Masked for display
+  status: "connected",
+  lastVerified: "24 January 2026 at 14:32",
+  connectedAt: "15 January 2026",
+}
+
+export const submissionPermissions: SubmissionPermission[] = [
+  {
+    id: "ct600",
+    name: "CT600 Corporation Tax Returns",
+    description: "Submit CT600 corporation tax returns to HMRC",
+    authorised: true,
+  },
+  {
+    id: "rnd",
+    name: "R&D Tax Credit Claims",
+    description: "Submit R&D tax credit claims under SME and RDEC schemes",
+    authorised: true,
+  },
+  {
+    id: "ixbrl",
+    name: "iXBRL Submissions",
+    description: "Submit iXBRL tagged accounts and computations",
+    authorised: true,
   },
 ]
