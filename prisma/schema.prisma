@@ -1,0 +1,600 @@
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// TAXENGINE SCHEMA - Prisma Schema for TaxEngine SaaS Product
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 
+// This schema is synced with the main schema at ct600-app/prisma/taxengineschema.prisma
+// Uses Supabase PostgreSQL as the database provider
+//
+// Naming Conventions:
+// - Model names: TitleCase (e.g., ClientCompany, AuditLog)
+// - Field names: camelCase (e.g., clientCompanyId, createdAt)
+//
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 1: USER MANAGEMENT & AUTHENTICATION
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/// User roles enum for TaxEngine SaaS
+enum UserRole {
+  ADMINISTRATOR    // Full access to all features including user management, submissions, and settings
+  CLAIM_PROCESSOR  // Can view and edit claims, upload documents, and build CT600s. Cannot submit or manage users.
+}
+
+/// User status enum
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING_INVITATION
+}
+
+/// TaxEngine SaaS Users
+model TaxEngineUser {
+  id                    Int        @id @default(autoincrement())
+  uuid                  String     @unique @default(uuid())
+  // Basic info
+  firstName             String?    @db.VarChar(255)
+  lastName              String?    @db.VarChar(255)
+  email                 String     @unique @db.VarChar(255)
+  username              String?    @unique @db.VarChar(255)
+  avatarUrl             String?    @db.VarChar(500)
+  // Role and status
+  role                  UserRole   @default(CLAIM_PROCESSOR)
+  status                UserStatus @default(ACTIVE)
+  // Authentication
+  hash                  String?
+  salt                  String?
+  resetPasswordToken    String?    @db.VarChar(255)
+  resetPasswordExpires  DateTime?
+  // SSO/OAuth data
+  ssoProvider           String?    @db.VarChar(50)
+  ssoProviderId         String?    @db.VarChar(255)
+  // Activity tracking
+  lastLoginAt           DateTime?
+  invitationSentAt      DateTime?
+  invitationAcceptedAt  DateTime?
+  invitedById           Int?
+  // Timestamps
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  // Relations
+  invitedBy             TaxEngineUser?    @relation("UserInvitations", fields: [invitedById], references: [id])
+  invitedUsers          TaxEngineUser[]   @relation("UserInvitations")
+  auditLogEntries       AuditLog[]
+  claimAssignments      ClaimPack[]       @relation("ClaimAssignee")
+  createdClaims         ClaimPack[]       @relation("ClaimCreator")
+  submissionsCreated    Submission[]      @relation("SubmissionCreator")
+  templateEdits         Template[]        @relation("TemplateLastEditor")
+
+  @@map("TaxEngineUsers")
+}
+
+/// Permissions matrix - defines what each role can do
+model Permission {
+  id              Int      @id @default(autoincrement())
+  uuid            String   @unique @default(uuid())
+  name            String   @db.VarChar(100)
+  description     String?
+  code            String   @unique @db.VarChar(50)
+  // Permission flags per role
+  administrator   Boolean  @default(true)
+  claimProcessor  Boolean  @default(false)
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("Permissions")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 2: AUDIT LOG
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/// Audit log categories
+enum AuditCategory {
+  AUTH
+  CLAIM
+  CLIENT
+  SUBMISSION
+  SETTINGS
+  USER
+  DOCUMENT
+}
+
+/// Immutable audit log for tracking all system events
+model AuditLog {
+  id              Int           @id @default(autoincrement())
+  uuid            String        @unique @default(uuid())
+  action          String        @db.VarChar(255)
+  details         String?
+  category        AuditCategory
+  userId          Int?
+  clientCompanyId Int?
+  claimPackId     Int?
+  ipAddress       String?       @db.VarChar(45)
+  userAgent       String?       @db.VarChar(500)
+  timestamp       DateTime      @default(now())
+
+  // Relations
+  user            TaxEngineUser?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  clientCompany   ClientCompany?  @relation(fields: [clientCompanyId], references: [id], onDelete: SetNull)
+  claimPack       ClaimPack?      @relation(fields: [claimPackId], references: [id], onDelete: SetNull)
+
+  @@index([timestamp])
+  @@index([category])
+  @@index([userId])
+  @@map("AuditLog")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 3: TEMPLATES
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+enum TemplateCategory {
+  EXPORT
+  REPORT
+  LETTER
+}
+
+model Template {
+  id                Int              @id @default(autoincrement())
+  uuid              String           @unique @default(uuid())
+  name              String           @db.VarChar(255)
+  description       String?
+  category          TemplateCategory
+  version           String           @db.VarChar(20)
+  templateType      String?          @db.VarChar(50)
+  templateKey       String?          @db.VarChar(255)
+  templateData      Json?
+  isActive          Boolean          @default(true)
+  isDefault         Boolean          @default(false)
+  lastModifiedById  Int?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  lastModifiedBy    TaxEngineUser?   @relation("TemplateLastEditor", fields: [lastModifiedById], references: [id])
+
+  @@map("Templates")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 4: CLAIM WORKFLOW
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+enum ClaimStage {
+  UPLOAD
+  SCAN_EXTRACT
+  BUILD_CT600
+  REVIEW
+  SUBMIT
+}
+
+enum ClaimStatus {
+  IN_PROGRESS
+  READY
+  AWAITING
+  COMPLETED
+  ON_HOLD
+}
+
+model ClaimPack {
+  id                       Int           @id @default(autoincrement())
+  uuid                     String        @unique @default(uuid())
+  title                    String        @db.VarChar(255)
+  periodLabel              String?       @db.VarChar(100)
+  status                   ClaimStatus   @default(IN_PROGRESS)
+  currentStage             ClaimStage    @default(UPLOAD)
+  nextAction               String?       @db.VarChar(255)
+  progress                 Int           @default(0)
+  clientCompanyId          Int
+  accountingPeriodId       Int?
+  ct600GroupId             Int?          @unique
+  assignedToId             Int?
+  createdById              Int?
+  uploadCompletedAt        DateTime?
+  scanExtractCompletedAt   DateTime?
+  buildCt600CompletedAt    DateTime?
+  reviewCompletedAt        DateTime?
+  submittedAt              DateTime?
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  clientCompany            ClientCompany    @relation(fields: [clientCompanyId], references: [id], onDelete: Cascade)
+  accountingPeriod         AccountingPeriod? @relation(fields: [accountingPeriodId], references: [id])
+  ct600Group               Ct600Group?      @relation(fields: [ct600GroupId], references: [id])
+  assignedTo               TaxEngineUser?   @relation("ClaimAssignee", fields: [assignedToId], references: [id])
+  createdBy                TaxEngineUser?   @relation("ClaimCreator", fields: [createdById], references: [id])
+  auditLogs                AuditLog[]
+  submissions              Submission[]
+
+  @@map("ClaimPacks")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 5: SUBMISSIONS
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  ACCEPTED
+  REJECTED
+  PENDING_RESPONSE
+}
+
+model Submission {
+  id                Int              @id @default(autoincrement())
+  uuid              String           @unique @default(uuid())
+  title             String           @db.VarChar(255)
+  packRef           String?          @db.VarChar(100)
+  status            SubmissionStatus @default(DRAFT)
+  clientCompanyId   Int
+  claimPackId       Int?
+  ct600GroupId      Int?
+  correlationId     String?          @db.VarChar(255)
+  submittedAt       DateTime?
+  submittedById     Int?
+  hmrcResponse      Json?
+  receiptPdfKey     String?          @db.VarChar(255)
+  receiptXml        String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  clientCompany     ClientCompany    @relation(fields: [clientCompanyId], references: [id], onDelete: Cascade)
+  claimPack         ClaimPack?       @relation(fields: [claimPackId], references: [id])
+  ct600Group        Ct600Group?      @relation(fields: [ct600GroupId], references: [id])
+  submittedBy       TaxEngineUser?   @relation("SubmissionCreator", fields: [submittedById], references: [id])
+
+  @@map("Submissions")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 6: CLIENT COMPANIES
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+model ClientCompany {
+  id                    Int                  @id @default(autoincrement())
+  uuid                  String               @unique @default(uuid())
+  ucc                   String?              @unique
+  companyName           String
+  companyNumber         String?
+  utr                   String?              @db.VarChar(255)
+  vatNumber             String?              @db.VarChar(50)
+  payeReference         String?              @db.VarChar(100)
+  registeredAddress     Json?
+  tradingAddress        Json?
+  phone                 String?              @db.VarChar(50)
+  email                 String?              @db.VarChar(255)
+  website               String?              @db.VarChar(255)
+  industry              String?              @db.VarChar(255)
+  sicCodes              String[]
+  bio                   String?
+  companyYearEndDay     Int?
+  companyYearEndMonth   Int?
+  isActive              Boolean              @default(true)
+  lifecycleStage        String?              @db.VarChar(100)
+  bankName              String?              @db.VarChar(255)
+  bankAccountName       String?              @db.VarChar(255)
+  bankAccountNumber     String?              @db.VarChar(50)
+  bankSortCode          String?              @db.VarChar(20)
+  referralCompany       String?              @db.VarChar(255)
+  referralFee           Decimal?
+  referralType          String?              @db.VarChar(100)
+  directorsList         Json?
+  companiesHouseData    Json?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  // Relations
+  accountingPeriods     AccountingPeriod[]   @relation("ClientCompanyToAccountingPeriods")
+  ct600Groups           Ct600Group[]
+  ct600AlphaDatasets    Ct600AlphaDataset[]
+  files                 File[]
+  claimPacks            ClaimPack[]
+  submissions           Submission[]
+  auditLogs             AuditLog[]
+  invoices              Invoice[]
+  clientContacts        ClientContact[]
+  clientAccountant      ClientAccountant?
+
+  @@map("ClientCompanies")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 7: CLIENT CONTACTS & ACCOUNTANT
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+model ClientContact {
+  id                        Int              @id @default(autoincrement())
+  uuid                      String           @unique @default(uuid())
+  clientCompanyId           Int
+  name                      String?          @db.VarChar(255)
+  email                     String?          @db.VarChar(255)
+  phone                     String?          @db.VarChar(50)
+  mobile                    String?          @db.VarChar(50)
+  contactType               String?          @db.VarChar(100)
+  thirdPartyCompanyName     String?          @db.VarChar(255)
+  isKeyContact              Boolean          @default(false)
+  payrollPermissions        Boolean          @default(false)
+  suppliersPermissions      Boolean          @default(false)
+  reportPermissions         Boolean          @default(false)
+  totalClaimPermissions     Boolean          @default(false)
+  financialDocsPermissions  Boolean          @default(false)
+  invoicingCc               Boolean          @default(false)
+  archived                  Boolean          @default(false)
+  dateAdded                 DateTime?
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+
+  clientCompany             ClientCompany    @relation(fields: [clientCompanyId], references: [id], onDelete: Cascade)
+
+  @@map("ClientContacts")
+}
+
+model ClientAccountant {
+  id                        Int              @id @default(autoincrement())
+  uuid                      String           @unique @default(uuid())
+  clientCompanyId           Int              @unique
+  name                      String?          @db.VarChar(255)
+  email                     String?          @db.VarChar(255)
+  phone                     String?          @db.VarChar(50)
+  website                   String?          @db.VarChar(255)
+  accountantCompanyName     String?          @db.VarChar(255)
+  payrollPermissions        Boolean          @default(true)
+  suppliersPermissions      Boolean          @default(true)
+  reportPermissions         Boolean          @default(false)
+  totalClaimPermissions     Boolean          @default(false)
+  financialDocsPermissions  Boolean          @default(true)
+  invoicingCc               Boolean          @default(false)
+  ratingOutOfFive           Int?
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+
+  clientCompany             ClientCompany    @relation(fields: [clientCompanyId], references: [id], onDelete: Cascade)
+
+  @@map("ClientAccountants")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 8: GOVERNMENT GATEWAY CREDENTIALS
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+enum GatewayStatus {
+  CONNECTED
+  DISCONNECTED
+  EXPIRED
+}
+
+model GovernmentGateway {
+  id                    Int            @id @default(autoincrement())
+  uuid                  String         @unique @default(uuid())
+  name                  String?        @db.VarChar(255)
+  isDefault             Boolean        @default(false)
+  agentUserId           String         @db.VarChar(255)
+  encryptedPassword     String?        @db.VarChar(500)
+  status                GatewayStatus  @default(DISCONNECTED)
+  lastVerifiedAt        DateTime?
+  connectedAt           DateTime?
+  disconnectedAt        DateTime?
+  ct600Authorised       Boolean        @default(false)
+  rndAuthorised         Boolean        @default(false)
+  ixbrlAuthorised       Boolean        @default(false)
+  lastModifiedById      Int?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  @@map("GovernmentGateway")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 9: INVOICING & BILLING
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum InvoiceType {
+  STANDARD
+  PROFORMA
+  CREDIT_NOTE
+}
+
+model Invoice {
+  id                  Int           @id @default(autoincrement())
+  uuid                String        @unique @default(uuid())
+  invoiceNumber       String?       @unique @db.VarChar(50)
+  invoiceDate         DateTime?
+  dueDate             DateTime?
+  clientCompanyId     Int
+  accountingPeriodId  Int?
+  claimPackId         Int?
+  invoiceType         InvoiceType   @default(STANDARD)
+  status              InvoiceStatus @default(DRAFT)
+  claimValue          Decimal?
+  feePercentage       Decimal?
+  feeAmount           Decimal?
+  vatAmount           Decimal?
+  totalAmount         Decimal?
+  clientPayout        Decimal?
+  paymentTermsDays    Int?          @default(30)
+  paymentReceivedAt   DateTime?
+  invoicePdfKey       String?       @db.VarChar(255)
+  invoiceDocxKey      String?       @db.VarChar(255)
+  rateBreakdown       Json?
+  createdByEmail      String?       @db.VarChar(255)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  clientCompany       ClientCompany @relation(fields: [clientCompanyId], references: [id], onDelete: Cascade)
+
+  @@map("Invoices")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 10: ACCOUNTING PERIODS
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+model AccountingPeriod {
+  id                    Int                  @id @default(autoincrement())
+  uuid                  String               @unique @default(uuid())
+  clientCompanyId       Int?
+  clientCompanyUuid     String?              @default(uuid())
+  status                String?              @db.VarChar(100)
+  startDate             DateTime?
+  endDate               DateTime?
+  value                 Decimal?
+  method                String?              @db.VarChar(255)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  clientCompany         ClientCompany?       @relation("ClientCompanyToAccountingPeriods", fields: [clientCompanyId], references: [id], onDelete: Cascade)
+  ct600Groups           Ct600Group[]
+  ct600AlphaDatasets    Ct600AlphaDataset[]
+  files                 File[]               @relation("FilesToAccountingPeriod")
+  claimPacks            ClaimPack[]
+
+  @@map("AccountingPeriods")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 11: CT600 GROUPS & ALPHA DATASETS
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+model Ct600Group {
+  id                            Int                 @id @default(autoincrement())
+  uuid                          String?             @unique @default(uuid())
+  clientCompanyId               Int?
+  clientCompanyUuid             String?             @default(uuid())
+  accountingPeriodId            Int?
+  accountingPeriodUuid          String?             @default(uuid())
+  isNewNumberSystem             Boolean?
+  name                          String?             @db.VarChar(255)
+  newCt600                      String?             @db.VarChar(255)
+  newCt600Json                  String?
+  newCt600JsonData              Json?
+  newTaxComp                    String?             @db.VarChar(255)
+  numbersUsed                   String?             @db.VarChar(255)
+  numbersPdfDoc                 String?             @db.VarChar(255)
+  ct600Used                     String?             @db.VarChar(255)
+  dateGroupCreated              DateTime            @default(now())
+  userCreated                   String?             @db.VarChar(255)
+  accountType                   String?             @db.VarChar(255)
+  paidTax                       String?             @db.VarChar(255)
+  preRdTax                      Decimal?
+  postRdTax                     Decimal?
+  percentageOfPayroll           Decimal?
+  cjrsAmount                    Decimal?
+  declarationName               String?             @db.VarChar(255)
+  repaymentOfCorpTax            Decimal?
+  taxCredit                     Decimal?
+  taxRefundFromLossCb           Decimal?
+  taxLossesPreserved            Decimal?
+  reductionTaxPayable           Decimal?
+  rdecTax                       Decimal?
+  accountantProofed             String?             @db.VarChar(255)
+  feedback                      Json?               @default("[]")
+  feedbackUser                  String?             @db.VarChar(255)
+  feedbackTime                  DateTime?
+  testSubmitted                 Boolean?            @default(false)
+  liveSubmitted                 Boolean?            @default(false)
+  testLastStatus                String?             @db.VarChar(255)
+  liveLastStatus                String?             @db.VarChar(255)
+  timestampTestSubmission       DateTime?
+  timestampLiveSubmission       DateTime?
+  testSubmissionError           String?
+  liveSubmissionError           String?
+  correlationId                 String?             @db.VarChar(255)
+  testPollNarrativeSelectedId   String?             @db.VarChar(255)
+  livePollNarrativeSelectedId   String?             @db.VarChar(255)
+  testReceipt                   String?
+  createdAt                     DateTime            @default(now())
+  updatedAt                     DateTime            @updatedAt
+  ct600AlphaDatasetId           Int?
+  ct600AlphaDatasetUuid         String?
+
+  ct600AlphaDataset             Ct600AlphaDataset?  @relation(fields: [ct600AlphaDatasetId], references: [id], onDelete: SetNull)
+  accountingPeriod              AccountingPeriod?   @relation(fields: [accountingPeriodId], references: [id], onDelete: Cascade)
+  clientCompany                 ClientCompany?      @relation(fields: [clientCompanyId], references: [id], onDelete: Cascade)
+  claimPack                     ClaimPack?
+  submissions                   Submission[]
+
+  @@map("Ct600Groups")
+}
+
+model Ct600AlphaDataset {
+  id                    Int               @id @default(autoincrement())
+  uuid                  String            @unique @default(uuid())
+  clientCompanyId       Int?
+  clientCompanyUuid     String?           @default(uuid())
+  accountingPeriodId    Int?
+  accountingPeriodUuid  String?           @default(uuid())
+  ct600FileId           Int?              @unique
+  ct600FileUuid         String?
+  ct600FileKey          String?
+  ct600Values           Json?
+
+  ct600File             File?             @relation("AlphaToFile", fields: [ct600FileId], references: [id], onDelete: SetNull)
+  accountingPeriod      AccountingPeriod? @relation(fields: [accountingPeriodId], references: [id], onDelete: Cascade)
+  clientCompany         ClientCompany?    @relation(fields: [clientCompanyId], references: [id], onDelete: Cascade)
+  ct600Groups           Ct600Group[]
+
+  @@map("Ct600AlphaDatasets")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 12: FILES
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+model File {
+  id                    Int                 @id @default(autoincrement())
+  uuid                  String              @unique @default(uuid())
+  clientCompanyId       Int?
+  clientCompanyUuid     String?             @default(uuid())
+  accountingPeriodId    Int?
+  companyName           String?             @db.VarChar(255)
+  ucc                   String?             @db.VarChar(255)
+  fileKey               String              @db.VarChar(255)
+  originalFileName      String?             @db.VarChar(255)
+  fileName              String?             @db.VarChar(255)
+  fileType              String?             @db.VarChar(100)
+  dateCreated           DateTime            @default(now())
+  deleted               Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  clientCompany         ClientCompany?      @relation(fields: [clientCompanyId], references: [id], onDelete: Cascade)
+  accountingPeriod      AccountingPeriod?   @relation("FilesToAccountingPeriod", fields: [accountingPeriodId], references: [id])
+  ct600AlphaDataset     Ct600AlphaDataset?  @relation("AlphaToFile")
+
+  @@map("Files")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// SECTION 13: SESSION
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+model Session {
+  sid    String   @id @db.VarChar(255)
+  sess   Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire])
+  @@map("Sessions")
+}
