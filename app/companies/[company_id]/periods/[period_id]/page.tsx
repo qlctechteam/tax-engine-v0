@@ -17,7 +17,6 @@ import {
   FileSpreadsheet,
   Check,
   FileText,
-  FileUp,
   X,
   Sparkles,
 } from "lucide-react"
@@ -246,7 +245,7 @@ export default function PeriodWorkspacePage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <FileSpreadsheet className="h-5 w-5 text-primary" />
+                        <FileText className="h-5 w-5 text-primary" />
                       </div>
                       <div>
                         <CardTitle className="text-base">CT600 Document</CardTitle>
@@ -276,7 +275,7 @@ export default function PeriodWorkspacePage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                        <FileUp className="h-5 w-5 text-emerald-600" />
+                        <FileSpreadsheet className="h-5 w-5 text-emerald-600" />
                       </div>
                       <div>
                         <CardTitle className="text-base">Qualifying Expenditure</CardTitle>
@@ -309,37 +308,68 @@ export default function PeriodWorkspacePage() {
                     <CardTitle className="text-base">Uploaded Documents</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {uploadedFiles.map((file) => (
-                      <div
-                        key={file.id}
-                        className="flex items-center gap-4 p-4 rounded-lg border border-border hover:bg-muted/30 transition-colors"
-                      >
-                        <Checkbox
-                          id={file.id}
-                          checked={selectedFileIds.includes(file.id)}
-                          onCheckedChange={() => toggleFileSelection(file.id)}
-                          className="h-5 w-5"
-                        />
-                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground text-sm truncate">{file.name}</p>
-                          <p className="text-xs text-muted-foreground">Uploaded: {file.uploadedAt}</p>
-                        </div>
-                        <Badge 
-                          variant="outline" 
+                    {uploadedFiles.map((file) => {
+                      const isSelected = selectedFileIds.includes(file.id)
+                      return (
+                        <div
+                          key={file.id}
                           className={cn(
-                            "text-xs flex-shrink-0",
-                            file.type === "ct600" 
-                              ? "bg-primary/10 text-primary border-primary/20" 
-                              : "bg-muted text-muted-foreground border-border"
+                            "flex items-center gap-4 p-4 rounded-lg border transition-colors",
+                            isSelected
+                              ? file.type === "ct600"
+                                ? "bg-primary/10 border-primary/20"
+                                : "bg-emerald-500/10 border-emerald-500/20"
+                              : "border-border hover:bg-muted/30"
                           )}
                         >
-                          {file.type === "ct600" ? "CT600" : "Expenditure"}
-                        </Badge>
-                      </div>
-                    ))}
+                          <Checkbox
+                            id={file.id}
+                            checked={isSelected}
+                            onCheckedChange={() => toggleFileSelection(file.id)}
+                            className="h-5 w-5"
+                          />
+                          <div className={cn(
+                            "h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0",
+                            isSelected
+                              ? file.type === "ct600"
+                                ? "bg-primary/10"
+                                : "bg-emerald-500/10"
+                              : "bg-muted"
+                          )}>
+                            {file.type === "ct600" ? (
+                              <FileText className={cn(
+                                "h-5 w-5",
+                                isSelected
+                                  ? "text-primary"
+                                  : "text-muted-foreground"
+                              )} />
+                            ) : (
+                              <FileSpreadsheet className={cn(
+                                "h-5 w-5",
+                                isSelected
+                                  ? "text-emerald-600"
+                                  : "text-muted-foreground"
+                              )} />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground text-sm truncate">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">Uploaded: {file.uploadedAt}</p>
+                          </div>
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "text-xs flex-shrink-0",
+                              file.type === "ct600" 
+                                ? "bg-primary/10 text-primary border-primary/20" 
+                                : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            )}
+                          >
+                            {file.type === "ct600" ? "CT600" : "Expenditure"}
+                          </Badge>
+                        </div>
+                      )
+                    })}
                   </CardContent>
                 </Card>
               )}
