@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { NavItem } from "./nav-item"
 import { AuthUser } from "@/lib/types"
@@ -27,6 +28,9 @@ export function Sidebar({
   currentUser: AuthUser | null
   onLogout: () => void
 }) {
+
+  const router = useRouter()
+
   const navItems = [
     { href: "/", label: "Home", icon: LayoutGrid },
     { href: "/claims", label: "Claims", icon: FileText },
@@ -75,14 +79,12 @@ export function Sidebar({
           <p className="px-3 mb-2 text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">Workspace</p>
           <div className="flex flex-col gap-1">
             {navItems.map((item) => (
-              <a key={item.href} href={item.href} onClick={() => setIsOpen(false)}>
-                <NavItem
-                  active={isActive(item.href)}
-                  icon={item.icon}
-                  label={item.label}
-                  onClick={() => {}}
-                />
-              </a>
+              <NavItem
+                active={isActive(item.href)}
+                icon={item.icon}
+                label={item.label}
+                onClick={() => router.push(item.href)}
+              />
             ))}
           </div>
         </nav>
