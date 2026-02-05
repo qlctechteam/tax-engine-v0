@@ -81,44 +81,9 @@ export default function ClaimsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
-      {/* Progress Bar - Claims workflow stages */}
-      <div className="mb-8">
-        <div className="grid grid-cols-6 w-full">
-          {[
-            { label: "Scan CT600" },
-            { label: "Review" },
-            { label: "Adjustments" },
-            { label: "Final Review" },
-            { label: "DocuSign" },
-            { label: "Submit" },
-          ].map((item, idx, arr) => {
-            const isLast = idx === arr.length - 1
-            
-            return (
-              <div
-                key={item.label}
-                className="flex items-center"
-              >
-                {/* Step pill - all steps shown as inactive until claim is in progress */}
-                <div
-                  className="flex-shrink-0 px-3 py-1.5 rounded-md text-sm font-medium bg-muted text-muted-foreground"
-                >
-                  {item.label}
-                </div>
-                
-                {/* Arrow connector */}
-                {!isLast && (
-                  <div className="flex-1 flex items-center justify-center min-w-0 px-1">
-                    <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground/40" />
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
+    <div className="p-6 lg:p-8 container mx-auto">
+      <div className="flex items-center justify-between mb-6">
+      <h1 className="text-2xl font-bold text-foreground mb-6">Claims</h1>
       {/* Primary CTA - Start Claim */}
       <div className="mb-10">
         <Dialog open={startClaimOpen} onOpenChange={setStartClaimOpen}>
@@ -128,7 +93,7 @@ export default function ClaimsPage() {
               className="group w-full sm:w-auto h-12 px-8 text-base tracking-tight text-primary-foreground font-bold rounded-xl border-t border-t-white/20 border-b-2 border-b-black/15 border-x border-x-white/10 bg-gradient-to-b from-primary/90 to-primary animate-cta-breathe hover:from-primary/80 hover:to-primary hover:shadow-[0_4px_0_0_rgba(0,0,0,0.15),0_6px_12px_-2px_rgba(0,0,0,0.3),0_12px_24px_-4px_rgba(0,0,0,0.2),inset_0_1px_2px_rgba(255,255,255,0.2),0_0_24px_-4px_var(--primary)] hover:translate-y-[-2px] active:translate-y-[1px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.25),0_2px_4px_-2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(0,0,0,0.1)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-[transform,background] duration-150"
               onClick={handleStartClaim}
             >
-              <span>Start Claim</span>
+              <span>Start New Claim</span>
               <ChevronRight className="h-5 w-5 ml-2 transition-transform duration-150 group-hover:translate-x-0.5" />
             </Button>
           </DialogTrigger>
@@ -242,7 +207,7 @@ export default function ClaimsPage() {
           </DialogContent>
         </Dialog>
       </div>
-
+      </div>
       {/* Recent Claims Table */}
       <div>
         <h3 className="text-sm font-medium text-muted-foreground mb-4">Recent Claims</h3>

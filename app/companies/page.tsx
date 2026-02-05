@@ -221,10 +221,10 @@ export default function CompaniesPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+    <div className="p-6 lg:p-8 mx-auto container">
       {/* Header with actions */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-foreground">Clients</h2>
+        <h1 className="text-2xl font-bold text-foreground">Clients</h1>
         <div className="flex gap-2">
           {/* CSV Upload Dialog */}
           <Dialog open={csvUploadOpen} onOpenChange={setCsvUploadOpen}>

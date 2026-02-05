@@ -80,79 +80,81 @@ export default function SubmissionsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
-      {/* Primary CTA - Start Submission */}
-      <div className="mb-10">
-        <Dialog open={startSubmissionOpen} onOpenChange={(open) => {
-          setStartSubmissionOpen(open)
-          if (!open) setSearchQuery("")
-        }}>
-          <DialogTrigger asChild>
-            <Button
-              size="lg"
-              className="group w-full sm:w-auto h-12 px-8 text-base tracking-tight text-primary-foreground font-bold rounded-xl border-t border-t-white/20 border-b-2 border-b-black/15 border-x border-x-white/10 bg-gradient-to-b from-primary/90 to-primary animate-cta-breathe hover:from-primary/80 hover:to-primary hover:shadow-[0_4px_0_0_rgba(0,0,0,0.15),0_6px_12px_-2px_rgba(0,0,0,0.3),0_12px_24px_-4px_rgba(0,0,0,0.2),inset_0_1px_2px_rgba(255,255,255,0.2),0_0_24px_-4px_var(--primary)] hover:translate-y-[-2px] active:translate-y-[1px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.25),0_2px_4px_-2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(0,0,0,0.1)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-[transform,background] duration-150"
-            >
-              <span>Start Submission</span>
-              <ChevronRight className="h-5 w-5 ml-2 transition-transform duration-150 group-hover:translate-x-0.5" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Select Claim to Submit</DialogTitle>
-              <DialogDescription>
-                Choose a processed claim to begin the submission process
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="py-4">
-              {/* Search input */}
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by company or claim name..."
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+    <div className="p-6 lg:p-8 container mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-foreground mb-6">Submissions</h1>
+        {/* Primary CTA - Start Submission */}
+        <div className="mb-10">
+          <Dialog open={startSubmissionOpen} onOpenChange={(open) => {
+            setStartSubmissionOpen(open)
+            if (!open) setSearchQuery("")
+          }}>
+            <DialogTrigger asChild>
+              <Button
+                size="lg"
+                className="group w-full sm:w-auto h-12 px-8 text-base tracking-tight text-primary-foreground font-bold rounded-xl border-t border-t-white/20 border-b-2 border-b-black/15 border-x border-x-white/10 bg-gradient-to-b from-primary/90 to-primary animate-cta-breathe hover:from-primary/80 hover:to-primary hover:shadow-[0_4px_0_0_rgba(0,0,0,0.15),0_6px_12px_-2px_rgba(0,0,0,0.3),0_12px_24px_-4px_rgba(0,0,0,0.2),inset_0_1px_2px_rgba(255,255,255,0.2),0_0_24px_-4px_var(--primary)] hover:translate-y-[-2px] active:translate-y-[1px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.25),0_2px_4px_-2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(0,0,0,0.1)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-[transform,background] duration-150"
+              >
+                <span>Start Submission</span>
+                <ChevronRight className="h-5 w-5 ml-2 transition-transform duration-150 group-hover:translate-x-0.5" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Select Claim to Submit</DialogTitle>
+                <DialogDescription>
+                  Choose a processed claim to begin the submission process
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="py-4">
+                {/* Search input */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by company or claim name..."
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
 
-              {/* Claims list */}
-              <ScrollArea className="h-72">
-                {filteredClaimsForSubmission.length === 0 ? (
-                  <div className="p-6 text-center">
-                    <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="font-medium text-foreground">No claims found</p>
-                    <p className="text-sm text-muted-foreground">
-                      {searchQuery ? "Try a different search term" : "No processed claims ready for submission"}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredClaimsForSubmission.map((claim) => (
-                      <button
-                        key={claim.id}
-                        onClick={() => handleStartSubmission(claim.id)}
-                        className="w-full flex items-center justify-between p-4 rounded-lg border border-border text-left transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground truncate">{claim.company}</p>
-                          <p className="text-sm text-muted-foreground truncate">{claim.claimName}</p>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                            <span>{claim.yearEnd}</span>
-                            <span className="font-medium text-emerald-600">{claim.amount}</span>
+                {/* Claims list */}
+                <ScrollArea className="h-72">
+                  {filteredClaimsForSubmission.length === 0 ? (
+                    <div className="p-6 text-center">
+                      <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="font-medium text-foreground">No claims found</p>
+                      <p className="text-sm text-muted-foreground">
+                        {searchQuery ? "Try a different search term" : "No processed claims ready for submission"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredClaimsForSubmission.map((claim) => (
+                        <button
+                          key={claim.id}
+                          onClick={() => handleStartSubmission(claim.id)}
+                          className="w-full flex items-center justify-between p-4 rounded-lg border border-border text-left transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground truncate">{claim.company}</p>
+                            <p className="text-sm text-muted-foreground truncate">{claim.claimName}</p>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                              <span>{claim.yearEnd}</span>
+                              <span className="font-medium text-emerald-600">{claim.amount}</span>
+                            </div>
                           </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-          </DialogContent>
-        </Dialog>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-2" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
-
       {/* Submitted Claims Table */}
       <div>
         <h3 className="text-sm font-medium text-muted-foreground mb-4">Submitted Claims</h3>
@@ -164,7 +166,7 @@ export default function SubmissionsPage() {
             <span>Claim</span>
             <span>Date Submitted</span>
             <span>Status</span>
-            <span>Receipt</span>
+            <span className="text-center">Receipt</span>
           </div>
           
           {/* Table Rows */}
@@ -196,15 +198,17 @@ export default function SubmissionsPage() {
                   <Badge variant="outline" className="w-fit text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
                     {claim.status}
                   </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => handleDownloadReceipt(claim)}
-                    title={`Download HMRC Receipt for ${claim.company}`}
-                  >
-                    <Download className="h-4 w-4 text-muted-foreground" />
-                  </Button>
+                  <div className="flex justify-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => handleDownloadReceipt(claim)}
+                      title={`Download HMRC Receipt for ${claim.company}`}
+                    >
+                      <Download className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
                 </div>
               )
             })}

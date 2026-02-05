@@ -34,11 +34,11 @@ export default function HomePage() {
   }) => (
     <button
       onClick={onClick}
-      className="group relative flex flex-col p-5 rounded-xl border border-border bg-card text-left transition-all duration-150 shadow-[var(--shadow-elevation-low)] hover:shadow-[var(--shadow-elevation-medium)] hover:border-border/80 hover:bg-muted/30 active:shadow-[var(--shadow-elevation-low)] active:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group relative flex flex-col p-5 rounded-xl border border-border bg-card text-left transition-all duration-150 hover:border-border/80 hover:bg-muted/30 active:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-muted/80 transition-colors group-hover:bg-muted">
-          <Icon className="h-5 w-5 text-muted-foreground" />
+        <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary transition-colors text-primary-foreground group-hover:text-popover-foreground">
+          <Icon className="h-5 w-5" />
         </div>
         {count !== undefined && (
           <div className="text-right">
@@ -47,9 +47,11 @@ export default function HomePage() {
           </div>
         )}
       </div>
+      <div className="flex items-center justify-between">
       <h3 className="text-base font-semibold text-foreground tracking-tight mb-1">{title}</h3>
+      <ChevronRight className="h-4 w-4 text-muted-foreground/50 transition-all duration-150 group-hover:text-muted-foreground group-hover:translate-x-0.5" />
+      </div>
       <p className="text-sm text-muted-foreground">{description}</p>
-      <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 transition-all duration-150 group-hover:text-muted-foreground group-hover:translate-x-0.5" />
     </button>
   )
 
