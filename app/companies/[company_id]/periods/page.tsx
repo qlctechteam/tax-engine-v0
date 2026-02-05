@@ -53,7 +53,7 @@ export default function PeriodsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+    <div className="container mx-auto p-6 lg:p-8">
       {/* Back button and header */}
       <div className="mb-6">
         <button

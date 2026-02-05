@@ -72,7 +72,7 @@ export default function DocuSignPage() {
     <div className="flex flex-col min-h-[calc(100vh-4rem)]">
       {/* Fixed Header */}
       <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4">
-        <div className="max-w-7xl mx-auto">
+        <div className="container mx-auto p-6 lg:p-8">
           {/* Back button and header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4">
@@ -139,7 +139,7 @@ export default function DocuSignPage() {
 
       {/* Main Content */}
       <div className="flex-1 container mx-auto p-6 lg:p-8">
-        <div className="max-w-3xl mx-auto">
+        <div className="">
           {/* Page Header */}
           <div className="mb-8">
             <h3 className="text-2xl font-bold text-foreground">Issue Documents</h3>
