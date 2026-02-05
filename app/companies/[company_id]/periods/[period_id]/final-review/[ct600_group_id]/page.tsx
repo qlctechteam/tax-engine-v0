@@ -95,7 +95,7 @@ export default function FinalReviewPage() {
       <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4">
         <div className="container mx-auto p-6 lg:p-8">
           {/* Back button and header */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => router.push(`/companies/${companyId}/periods/${periodId}`)}
@@ -116,7 +116,7 @@ export default function FinalReviewPage() {
           </div>
 
           {/* Workflow Progress Bar */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {workflowSteps.map((step, index) => {
               const isActive = step.id === currentStep
               const isCompleted = step.id < currentStep
@@ -146,7 +146,7 @@ export default function FinalReviewPage() {
                         {step.id}
                       </span>
                     )}
-                    <span className="hidden sm:inline">{step.label}</span>
+                    <span className={isActive ? "inline" : "hidden sm:inline"}>{step.label}</span>
                   </div>
                   {!isLast && (
                     <ChevronRight className="h-4 w-4 mx-1 text-muted-foreground/40 flex-shrink-0" />

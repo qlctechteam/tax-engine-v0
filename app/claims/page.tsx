@@ -211,17 +211,15 @@ export default function ClaimsPage() {
       {/* Recent Claims Table */}
       <div>
         <h3 className="text-sm font-medium text-muted-foreground mb-4">Recent Claims</h3>
-        
-        <div className="rounded-lg border border-border overflow-hidden">
-          {/* Table Header */}
+
+        {/* Desktop: table layout */}
+        <div className="hidden md:block rounded-lg border border-border overflow-hidden">
           <div className="grid grid-cols-[1fr_140px_100px_100px] gap-4 px-4 py-3 bg-muted/30 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
             <span>Company</span>
             <span>Processed by</span>
             <span>Year end</span>
             <span>Status</span>
           </div>
-          
-          {/* Table Rows */}
           <div className="divide-y divide-border">
             {recentClaims.map((claim) => (
               <button
@@ -238,6 +236,30 @@ export default function ClaimsPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Mobile: stacked layout with company, processed by + date, status right */}
+        <div className="md:hidden rounded-lg border border-border overflow-hidden divide-y divide-border">
+          {recentClaims.map((claim) => (
+            <button
+              key={claim.id}
+              onClick={() => router.push(`/companies/${claim.companyId}/periods/${claim.id}`)}
+              className="w-full px-4 py-3 flex flex-col gap-1 hover:bg-muted/30 transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="font-medium text-foreground flex-1 min-w-0 truncate">{claim.companyName}</span>
+                <Badge variant="outline" className={cn("shrink-0 text-xs", getStatusBadge(claim.status))}>
+                  {claim.status}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Processed by: {claim.processedBy || "—"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Year End: {claim.yearEnd}
+              </p>
+            </button>
+          ))}
         </div>
       </div>
     </div>
