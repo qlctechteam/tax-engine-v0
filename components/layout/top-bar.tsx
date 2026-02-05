@@ -27,7 +27,6 @@ export function TopBar({
   onClearSearch,
   searchQuery,
   setSearchQuery,
-  onMenuClick,
   isGatewayConnected,
   onGatewayClick,
   notifications,
@@ -41,7 +40,6 @@ export function TopBar({
   onClearSearch: () => void
   searchQuery: string
   setSearchQuery: (q: string) => void
-  onMenuClick: () => void
   isGatewayConnected: boolean
   onGatewayClick: () => void
   notifications: AppNotification[]
@@ -54,16 +52,7 @@ export function TopBar({
 
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex items-center gap-4 h-full px-4 lg:px-6">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="lg:hidden"
-          onClick={onMenuClick}
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
-
+      <div className="container mx-auto flex items-center justify-between gap-4 h-full px-4 lg:px-6">
         <div className="relative flex-1 max-w-xl">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
           <Input
