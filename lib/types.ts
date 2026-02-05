@@ -34,6 +34,7 @@ export interface HMRCValidationResult {
 export interface AuthUser {
   email: string
   name: string
+  role?: 'ADMINISTRATOR' | 'CLAIM_PROCESSOR'
 }
 
 // Auth storage key

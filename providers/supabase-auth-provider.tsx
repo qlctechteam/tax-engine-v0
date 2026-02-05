@@ -34,18 +34,44 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
   const supabase = getSupabaseClient()
 
-  // Fetch the user's TaxEngine profile
-  const fetchProfile = useCallback(async (userId: string) => {
+  // Fetch the user's TaxEngine profile (or create one if it doesn't exist)
+  const fetchProfile = useCallback(async (userId: string, userEmail?: string) => {
     setIsProfileLoading(true)
     try {
       const { data, error } = await supabase
-        .from('taxengine_users')
+        .from('TaxEngineUsers')
         .select('*')
         .eq('uuid', userId)
         .single()
 
       if (error) {
-        console.error('Error fetching profile:', error)
+        // PGRST116 = "No rows found" - user profile doesn't exist yet
+        if (error.code === 'PGRST116' && userEmail) {
+          console.log('Profile not found, creating new profile for user:', userId)
+          
+          // Auto-create the profile
+          const { data: newProfile, error: insertError } = await supabase
+            .from('TaxEngineUsers')
+            .insert({
+              uuid: userId,
+              email: userEmail,
+              role: 'CLAIM_PROCESSOR',
+              status: 'ACTIVE',
+            })
+            .select()
+            .single()
+
+          if (insertError) {
+            console.error('Error creating profile:', insertError.message, insertError.code, insertError.details)
+            return null
+          }
+
+          setProfile(newProfile)
+          return newProfile
+        }
+
+        // Log the actual error details
+        console.error('Error fetching profile:', error.message, error.code, error.details)
         return null
       }
       setProfile(data)
@@ -69,7 +95,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
         // Fetch profile if user exists
         if (initialSession?.user) {
-          await fetchProfile(initialSession.user.id)
+          await fetchProfile(initialSession.user.id, initialSession.user.email)
         }
       } catch (err) {
         console.error('Error initializing auth:', err)
@@ -87,7 +113,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         setUser(newSession?.user ?? null)
 
         if (event === 'SIGNED_IN' && newSession?.user) {
-          await fetchProfile(newSession.user.id)
+          await fetchProfile(newSession.user.id, newSession.user.email)
         } else if (event === 'SIGNED_OUT') {
           setProfile(null)
         }
@@ -114,7 +140,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
       // Update last login in profile
       if (data.user) {
         await supabase
-          .from('taxengine_users')
+          .from('TaxEngineUsers')
           .update({ lastLoginAt: new Date().toISOString() })
           .eq('uuid', data.user.id)
       }
@@ -188,7 +214,7 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
       // Create TaxEngine user profile
       if (data.user) {
-        await supabase.from('taxengine_users').insert({
+        await supabase.from('TaxEngineUsers').insert({
           uuid: data.user.id,
           email: data.user.email!,
           firstName: metadata?.firstName || null,

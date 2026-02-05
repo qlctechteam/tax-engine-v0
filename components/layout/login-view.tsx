@@ -138,9 +138,9 @@ export function LoginView({ onLogin }: { onLogin: (email: string, password: stri
           </CardContent>
         </Card>
 
-        {/* Demo credentials hint */}
+        {/* Login help */}
         <p className="mt-4 text-xs text-muted-foreground text-center">
-          Demo: demo@taxengine.io / demo123
+          Contact your administrator for access
         </p>
       </div>
     </div>

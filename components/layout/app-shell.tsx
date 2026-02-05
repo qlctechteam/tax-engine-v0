@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Sidebar } from "./sidebar"
 import { TopBar } from "./top-bar"
 import { LoginView } from "./login-view"
-import { useAuth } from "@/providers/auth-provider"
+import { useSupabaseAuth } from "@/providers/supabase-auth-provider"
 import { useApp } from "@/providers/app-provider"
 import { Company } from "@/lib/types"
 import { Loader2 } from "lucide-react"
@@ -13,7 +13,7 @@ import { Loader2 } from "lucide-react"
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { currentUser, isAuthLoading, login, logout } = useAuth()
+  const { user, profile, isLoading: isAuthLoading, signInWithEmail, signOut } = useSupabaseAuth()
   const { 
     clientList, 
     notifications, 
@@ -66,8 +66,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   // Show login if not authenticated
-  if (!currentUser) {
-    return <LoginView onLogin={login} />
+  if (!user) {
+    return <LoginView onLogin={signInWithEmail} />
+  }
+
+  // Build currentUser object from Supabase user and profile
+  const currentUser = {
+    email: user.email || '',
+    name: profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || user.email || '' : user.email || '',
+    role: profile?.role || 'CLAIM_PROCESSOR',
   }
 
   return (
@@ -77,7 +84,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         isOpen={sidebarOpen}
         setIsOpen={setSidebarOpen}
         currentUser={currentUser}
-        onLogout={logout}
+        onLogout={signOut}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
