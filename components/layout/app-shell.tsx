@@ -89,7 +89,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onClearSearch={() => setSearchResults([])}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
-          onMenuClick={() => setSidebarOpen(true)}
           isGatewayConnected={isGatewayConnected}
           onGatewayClick={handleGatewayClick}
           notifications={notifications}

@@ -20,7 +20,7 @@ export function NavItem({
         "group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 text-left outline-none",
         active
           ? "bg-gradient-to-b from-primary/90 to-primary text-primary-foreground shadow-[0_1px_0_0_rgba(255,255,255,0.1)_inset,0_-1px_0_0_rgba(0,0,0,0.15)_inset,var(--shadow-elevation-medium)]"
-          : "text-muted-foreground bg-transparent hover:bg-muted/80 hover:text-foreground hover:shadow-[var(--shadow-elevation-low)] active:bg-muted active:shadow-none"
+          : "text-muted-foreground bg-transparent hover:bg-muted hover:text-foreground hover:shadow-[var(--shadow-elevation-low)] active:bg-muted active:shadow-none"
       )}
     >
       <span

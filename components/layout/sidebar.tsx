@@ -92,15 +92,12 @@ export function Sidebar({
         {/* Footer with Settings and User */}
         <div className="p-3 border-t border-border bg-muted/30">
           <p className="px-3 mb-2 text-xs font-medium text-muted-foreground/70 uppercase tracking-wider">System</p>
-          <a href="/settings" onClick={() => setIsOpen(false)}>
             <NavItem
               active={isActive("/settings")}
               icon={Settings}
               label="Settings"
-              onClick={() => {}}
+              onClick={() => router.push("/settings")}
             />
-          </a>
-          
           {/* User section with logout */}
           {currentUser && (
             <div className="mt-3 pt-3 border-t border-border/60">

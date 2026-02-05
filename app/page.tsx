@@ -34,7 +34,7 @@ export default function HomePage() {
   }) => (
     <button
       onClick={onClick}
-      className="group relative flex flex-col p-5 rounded-xl border border-border bg-card text-left transition-all duration-150 hover:border-border/80 hover:bg-muted/30 active:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group relative flex flex-col p-5 rounded-xl border border-border bg-card text-left transition-all duration-150 hover:border-border/80 hover:bg-muted active:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary transition-colors text-primary-foreground group-hover:text-popover-foreground">

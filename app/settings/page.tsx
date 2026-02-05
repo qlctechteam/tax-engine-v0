@@ -927,9 +927,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6">
+    <div className="container mx-auto p-6 lg:p-8">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-foreground">Settings</h2>
+        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground">Workspace level configuration</p>
       </div>
 
