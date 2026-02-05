@@ -221,7 +221,7 @@ export default function CompaniesPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 mx-auto container">
+    <div className="container mx-auto p-6 lg:p-8">
       {/* Header with actions */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-foreground">Clients</h1>

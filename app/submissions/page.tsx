@@ -80,7 +80,7 @@ export default function SubmissionsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 container mx-auto">
+    <div className="container mx-auto p-6 lg:p-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-foreground">Submissions</h1>
         {/* Primary CTA - Start Submission */}

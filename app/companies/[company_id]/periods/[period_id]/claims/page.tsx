@@ -101,7 +101,7 @@ export default function ClaimsWorkspacePage() {
 
   if (!client) {
     return (
-      <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+      <div className="container mx-auto p-6 lg:p-8">
         <button
           onClick={() => router.push("/companies")}
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
@@ -118,7 +118,7 @@ export default function ClaimsWorkspacePage() {
 
   if (!period) {
     return (
-      <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+      <div className="container mx-auto p-6 lg:p-8">
         <button
           onClick={() => router.push(`/companies/${companyId}/periods`)}
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors"
@@ -136,7 +136,7 @@ export default function ClaimsWorkspacePage() {
   const icons = [Upload, ScanSearch, FileSpreadsheet, CheckCircle, SendHorizontal]
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+    <div className="container mx-auto p-6 lg:p-8">
       {/* Back button and header */}
       <div className="mb-6">
         <button

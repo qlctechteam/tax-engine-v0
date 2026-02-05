@@ -56,7 +56,7 @@ export default function HomePage() {
   )
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+    <div className="container mx-auto p-6 lg:p-8">
       {/* Page Header */}
       <div className="mb-10 text-center">
         <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">TaxEngine</h1>
