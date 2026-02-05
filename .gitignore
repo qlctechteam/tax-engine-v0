@@ -21,6 +21,7 @@ pnpm-debug.log*
 
 # OS
 .DS_Store
+._*
 
 # IDEs
 .vscode/
