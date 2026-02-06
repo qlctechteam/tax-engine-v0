@@ -2,21 +2,104 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { getSupabaseClient } from '@/lib/supabase'
-import type {
-  ClientCompany,
-  AccountingPeriod,
-  ClaimPack,
-  Submission,
-  AuditLog,
-  Template,
-  GovernmentGateway,
-} from '@/lib/supabase/database.types'
+
+// Types matching the Prisma schema
+export interface DbClientCompany {
+  id: number
+  uuid: string
+  companyName: string
+  companyNumber: string | null
+  utr: string | null
+  payeReference: string | null
+  email: string | null
+  phone: string | null
+  isActive: boolean
+  companyYearEndMonth: number | null
+  companyYearEndDay: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DbAccountingPeriod {
+  id: number
+  uuid: string
+  clientCompanyId: number | null
+  status: string | null
+  startDate: string | null
+  endDate: string | null
+  value: number | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DbClaimPack {
+  id: number
+  uuid: string
+  title: string
+  status: string
+  currentStage: string
+  progress: number
+  clientCompanyId: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DbSubmission {
+  id: number
+  uuid: string
+  title: string
+  status: string
+  clientCompanyId: number
+  submittedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DbAuditLog {
+  id: number
+  uuid: string
+  action: string
+  details: string | null
+  category: string
+  userId: number | null
+  timestamp: string
+}
+
+export interface DbTemplate {
+  id: number
+  uuid: string
+  name: string
+  description: string | null
+  category: string
+  version: string
+  isActive: boolean
+}
+
+export interface DbGovernmentGateway {
+  id: number
+  uuid: string
+  agentUserId: string
+  status: string
+  isDefault: boolean
+  lastVerifiedAt: string | null
+}
+
+export interface DbTaxEngineUser {
+  id: number
+  uuid: string
+  email: string
+  firstName: string | null
+  lastName: string | null
+  role: string
+  status: string
+  lastLoginAt: string | null
+}
 
 /**
- * Hook to fetch client companies
+ * Hook to fetch client companies from database
  */
 export function useClientCompanies() {
-  const [data, setData] = useState<ClientCompany[]>([])
+  const [data, setData] = useState<DbClientCompany[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -27,16 +110,23 @@ export function useClientCompanies() {
     setError(null)
     
     try {
+      console.log('Fetching client companies...')
       const { data: companies, error: fetchError } = await supabase
-        .from('client_companies')
+        .from('ClientCompanies')
         .select('*')
         .eq('isActive', true)
         .order('companyName', { ascending: true })
 
-      if (fetchError) throw fetchError
+      if (fetchError) {
+        console.error('Error fetching companies:', fetchError.message, fetchError.code)
+        throw fetchError
+      }
+      console.log('Fetched companies:', companies?.length || 0)
       setData(companies || [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch companies')
+      const message = err instanceof Error ? err.message : 'Failed to fetch companies'
+      console.error('useClientCompanies error:', message)
+      setError(message)
     } finally {
       setIsLoading(false)
     }
@@ -50,10 +140,10 @@ export function useClientCompanies() {
 }
 
 /**
- * Hook to fetch a single client company by ID
+ * Hook to fetch a single client company by ID or UUID
  */
 export function useClientCompany(id: number | string | null) {
-  const [data, setData] = useState<ClientCompany | null>(null)
+  const [data, setData] = useState<DbClientCompany | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -71,8 +161,8 @@ export function useClientCompany(id: number | string | null) {
       
       try {
         const query = typeof id === 'number'
-          ? supabase.from('client_companies').select('*').eq('id', id).single()
-          : supabase.from('client_companies').select('*').eq('uuid', id).single()
+          ? supabase.from('ClientCompanies').select('*').eq('id', id).single()
+          : supabase.from('ClientCompanies').select('*').eq('uuid', id).single()
 
         const { data: company, error: fetchError } = await query
 
@@ -94,15 +184,20 @@ export function useClientCompany(id: number | string | null) {
 /**
  * Hook to fetch accounting periods for a company
  */
-export function useAccountingPeriods(clientCompanyId: number | null) {
-  const [data, setData] = useState<AccountingPeriod[]>([])
+export function useAccountingPeriods(clientCompanyUuid: string | null) {
+  const [data, setData] = useState<DbAccountingPeriod[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refetchTrigger, setRefetchTrigger] = useState(0)
   
   const supabase = getSupabaseClient()
 
+  const refetch = useCallback(() => {
+    setRefetchTrigger(prev => prev + 1)
+  }, [])
+
   useEffect(() => {
-    if (!clientCompanyId) {
+    if (!clientCompanyUuid) {
       setIsLoading(false)
       return
     }
@@ -113,9 +208,9 @@ export function useAccountingPeriods(clientCompanyId: number | null) {
       
       try {
         const { data: periods, error: fetchError } = await supabase
-          .from('accounting_period')
+          .from('AccountingPeriods')
           .select('*')
-          .eq('clientCompanyId', clientCompanyId)
+          .eq('clientCompanyUuid', clientCompanyUuid)
           .order('endDate', { ascending: false })
 
         if (fetchError) throw fetchError
@@ -128,16 +223,16 @@ export function useAccountingPeriods(clientCompanyId: number | null) {
     }
 
     fetchData()
-  }, [clientCompanyId, supabase])
+  }, [clientCompanyUuid, supabase, refetchTrigger])
 
-  return { data, isLoading, error }
+  return { data, isLoading, error, refetch }
 }
 
 /**
  * Hook to fetch claim packs
  */
 export function useClaimPacks(clientCompanyId?: number) {
-  const [data, setData] = useState<ClaimPack[]>([])
+  const [data, setData] = useState<DbClaimPack[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -149,7 +244,7 @@ export function useClaimPacks(clientCompanyId?: number) {
     
     try {
       let query = supabase
-        .from('claim_packs')
+        .from('ClaimPacks')
         .select('*')
         .order('createdAt', { ascending: false })
 
@@ -179,7 +274,7 @@ export function useClaimPacks(clientCompanyId?: number) {
  * Hook to fetch submissions
  */
 export function useSubmissions(clientCompanyId?: number) {
-  const [data, setData] = useState<Submission[]>([])
+  const [data, setData] = useState<DbSubmission[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -191,7 +286,7 @@ export function useSubmissions(clientCompanyId?: number) {
     
     try {
       let query = supabase
-        .from('submissions')
+        .from('Submissions')
         .select('*')
         .order('createdAt', { ascending: false })
 
@@ -221,11 +316,9 @@ export function useSubmissions(clientCompanyId?: number) {
  * Hook to fetch audit logs
  */
 export function useAuditLogs(options?: { limit?: number; category?: string }) {
-  const [data, setData] = useState<AuditLog[]>([])
+  const [data, setData] = useState<DbAuditLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
-  const supabase = getSupabaseClient()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -233,24 +326,22 @@ export function useAuditLogs(options?: { limit?: number; category?: string }) {
       setError(null)
       
       try {
-        let query = supabase
-          .from('audit_log')
-          .select('*')
-          .order('timestamp', { ascending: false })
+        console.log('Fetching audit logs via API...')
+        const params = new URLSearchParams()
+        if (options?.limit) params.set('limit', String(options.limit))
+        if (options?.category) params.set('category', options.category)
+        
+        const response = await fetch(`/api/audit-logs?${params.toString()}`)
+        const result = await response.json()
 
-        if (options?.limit) {
-          query = query.limit(options.limit)
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to fetch audit logs')
         }
-
-        if (options?.category) {
-          query = query.eq('category', options.category)
-        }
-
-        const { data: logs, error: fetchError } = await query
-
-        if (fetchError) throw fetchError
-        setData(logs || [])
+        
+        console.log('Fetched audit logs:', result.logs?.length || 0)
+        setData(result.logs || [])
       } catch (err) {
+        console.error('useAuditLogs error:', err)
         setError(err instanceof Error ? err.message : 'Failed to fetch audit logs')
       } finally {
         setIsLoading(false)
@@ -258,7 +349,7 @@ export function useAuditLogs(options?: { limit?: number; category?: string }) {
     }
 
     fetchData()
-  }, [options?.limit, options?.category, supabase])
+  }, [options?.limit, options?.category])
 
   return { data, isLoading, error }
 }
@@ -267,7 +358,7 @@ export function useAuditLogs(options?: { limit?: number; category?: string }) {
  * Hook to fetch templates
  */
 export function useTemplates() {
-  const [data, setData] = useState<Template[]>([])
+  const [data, setData] = useState<DbTemplate[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -280,7 +371,7 @@ export function useTemplates() {
       
       try {
         const { data: templates, error: fetchError } = await supabase
-          .from('templates')
+          .from('Templates')
           .select('*')
           .eq('isActive', true)
           .order('name', { ascending: true })
@@ -304,7 +395,7 @@ export function useTemplates() {
  * Hook to fetch Government Gateway status
  */
 export function useGovernmentGateway() {
-  const [data, setData] = useState<GovernmentGateway | null>(null)
+  const [data, setData] = useState<DbGovernmentGateway | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -316,7 +407,7 @@ export function useGovernmentGateway() {
     
     try {
       const { data: gateway, error: fetchError } = await supabase
-        .from('government_gateway')
+        .from('GovernmentGateway')
         .select('*')
         .eq('isDefault', true)
         .single()
@@ -338,4 +429,40 @@ export function useGovernmentGateway() {
   }, [fetchData])
 
   return { data, isLoading, error, refetch: fetchData }
+}
+
+/**
+ * Hook to fetch TaxEngine users (for settings page)
+ */
+export function useTaxEngineUsers() {
+  const [data, setData] = useState<DbTaxEngineUser[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  const supabase = getSupabaseClient()
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true)
+      setError(null)
+      
+      try {
+        const { data: users, error: fetchError } = await supabase
+          .from('TaxEngineUsers')
+          .select('*')
+          .order('createdAt', { ascending: false })
+
+        if (fetchError) throw fetchError
+        setData(users || [])
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch users')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [supabase])
+
+  return { data, isLoading, error }
 }

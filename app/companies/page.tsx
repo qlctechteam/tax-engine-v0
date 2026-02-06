@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -36,7 +36,7 @@ import {
 
 export default function CompaniesPage() {
   const router = useRouter()
-  const { clientList, addClient, bulkAddClients } = useApp()
+  const { clientList, refetchClients, isLoadingClients } = useApp()
   
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null)
@@ -52,10 +52,20 @@ export default function CompaniesPage() {
   const [contactName, setContactName] = useState("")
   const [contactEmail, setContactEmail] = useState("")
   const [contactPhone, setContactPhone] = useState("")
+  const [yearEndMonth, setYearEndMonth] = useState<number | null>(null)
+  const [yearEndDay, setYearEndDay] = useState<number | null>(null)
   const [isSearching, setIsSearching] = useState(false)
-  const [companySearchResults, setCompanySearchResults] = useState<{ name: string; number: string }[]>([])
+  const [companySearchResults, setCompanySearchResults] = useState<{ 
+    name: string
+    number: string
+    status?: string
+    type?: string
+    address?: string | null
+  }[]>([])
   const [showCompanyResults, setShowCompanyResults] = useState(false)
   const [selectedFromSearch, setSelectedFromSearch] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // CSV Upload State
   const [csvUploadOpen, setCsvUploadOpen] = useState(false)
@@ -88,49 +98,138 @@ export default function CompaniesPage() {
     router.push(`/companies/${client.id}`)
   }
 
-  // Simulated Companies House API search
-  const searchCompaniesHouse = async (query: string) => {
-    if (query.length < 3) {
+  // Real Companies House API search (with debouncing)
+  const searchCompaniesHouse = useCallback(async (query: string) => {
+    if (query.length < 2) {
       setCompanySearchResults([])
       setShowCompanyResults(false)
+      setSearchError(null)
+      setIsSearching(false)
       return
     }
+    
     setIsSearching(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    const mockResults = [
-      { name: query.toUpperCase() + " LTD", number: String(Math.floor(10000000 + Math.random() * 90000000)) },
-      { name: query.toUpperCase() + " LIMITED", number: String(Math.floor(10000000 + Math.random() * 90000000)) },
-      { name: query.toUpperCase() + " HOLDINGS LTD", number: String(Math.floor(10000000 + Math.random() * 90000000)) },
-    ]
-    setCompanySearchResults(mockResults)
-    setShowCompanyResults(true)
-    setIsSearching(false)
-  }
+    setSearchError(null)
+    
+    try {
+      const response = await fetch(`/api/companies-house/search?q=${encodeURIComponent(query)}`)
+      const data = await response.json()
+      
+      if (!response.ok) {
+        setSearchError(data.error || 'Failed to search Companies House')
+        setCompanySearchResults([])
+      } else {
+        setCompanySearchResults(data.items || [])
+        setShowCompanyResults(true)
+      }
+    } catch (error) {
+      console.error('Error searching Companies House:', error)
+      setSearchError('Failed to connect to Companies House')
+      setCompanySearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }, [])
 
-  const handleSelectCompanyFromSearch = (result: { name: string; number: string }) => {
+  // Debounced search handler
+  const handleCompanyNameChange = useCallback((value: string) => {
+    setCompanyName(value)
+    setSelectedFromSearch(false)
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    
+    // Set loading state immediately for better UX
+    if (value.length >= 2) {
+      setIsSearching(true)
+    }
+    
+    // Debounce the actual API call
+    searchTimeoutRef.current = setTimeout(() => {
+      searchCompaniesHouse(value)
+    }, 300) // 300ms debounce
+  }, [searchCompaniesHouse])
+
+  const [isFetchingCompanyDetails, setIsFetchingCompanyDetails] = useState(false)
+
+  const handleSelectCompanyFromSearch = async (result: { name: string; number: string }) => {
     setCompanyName(result.name)
     setCompanyNumber(result.number)
     setSelectedFromSearch(true)
     setShowCompanyResults(false)
+    
+    // Fetch full company details to get year end
+    setIsFetchingCompanyDetails(true)
+    try {
+      const response = await fetch(`/api/companies-house/company/${encodeURIComponent(result.number)}`)
+      const data = await response.json()
+      
+      console.log('Company details response:', data)
+      if (response.ok) {
+        // Auto-populate year end from Companies House
+        if (data.yearEndMonth !== null && data.yearEndMonth !== undefined) {
+          console.log('Setting year end month:', data.yearEndMonth)
+          setYearEndMonth(data.yearEndMonth)
+        }
+        if (data.yearEndDay !== null && data.yearEndDay !== undefined) {
+          console.log('Setting year end day:', data.yearEndDay)
+          setYearEndDay(data.yearEndDay)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching company details:', error)
+      // Don't show error - user can still manually enter year end
+    } finally {
+      setIsFetchingCompanyDetails(false)
+    }
   }
 
-  const handleCreateClient = () => {
+  const [isCreatingClient, setIsCreatingClient] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+
+  const handleCreateClient = async () => {
     if (!companyName || !companyNumber || !utr || !contactName || !contactEmail || !contactPhone) return
     
-    const newClient: Company = {
-      id: `c${Date.now()}`,
-      name: companyName,
-      number: companyNumber,
-      utr,
-      payeReference: payeReference || undefined,
-      contactName,
-      contactEmail,
-      contactPhone,
-    }
+    setIsCreatingClient(true)
+    setCreateError(null)
     
-    addClient(newClient)
-    resetNewClientForm()
-    setNewClientOpen(false)
+    try {
+      const response = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName,
+          companyNumber,
+          utr,
+          payeReference: payeReference || null,
+          contactName,
+          contactEmail,
+          contactPhone,
+          companyYearEndMonth: yearEndMonth,
+          companyYearEndDay: yearEndDay,
+        }),
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        setCreateError(data.error || 'Failed to create client')
+        return
+      }
+      
+      // Refetch clients from database to update the list
+      refetchClients()
+      
+      resetNewClientForm()
+      setNewClientOpen(false)
+    } catch (error) {
+      console.error('Error creating client:', error)
+      setCreateError('Failed to create client. Please try again.')
+    } finally {
+      setIsCreatingClient(false)
+    }
   }
 
   const resetNewClientForm = () => {
@@ -141,9 +240,13 @@ export default function CompaniesPage() {
     setContactName("")
     setContactEmail("")
     setContactPhone("")
+    setYearEndMonth(null)
+    setYearEndDay(null)
     setSelectedFromSearch(false)
+    setIsFetchingCompanyDetails(false)
     setCompanySearchResults([])
     setShowCompanyResults(false)
+    setSearchError(null)
   }
 
   // CSV Parsing
@@ -211,12 +314,46 @@ export default function CompaniesPage() {
     }
   }
 
-  const handleBulkImport = () => {
-    if (csvData.length > 0) {
-      bulkAddClients(csvData)
-      setCsvData([])
-      setCsvErrors([])
-      setCsvUploadOpen(false)
+  const [isImporting, setIsImporting] = useState(false)
+  
+  const handleBulkImport = async () => {
+    if (csvData.length === 0) return
+    
+    setIsImporting(true)
+    
+    try {
+      const response = await fetch('/api/clients', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clients: csvData }),
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        setCsvErrors([data.error || 'Failed to import clients'])
+        return
+      }
+      
+      // Show results
+      if (data.errors && data.errors.length > 0) {
+        setCsvErrors(data.errors)
+      }
+      
+      // Refetch clients from database
+      refetchClients()
+      
+      if (data.created > 0) {
+        setCsvData([])
+        if (data.errors.length === 0) {
+          setCsvUploadOpen(false)
+        }
+      }
+    } catch (error) {
+      console.error('Error importing clients:', error)
+      setCsvErrors(['Failed to import clients. Please try again.'])
+    } finally {
+      setIsImporting(false)
     }
   }
 
@@ -326,8 +463,15 @@ export default function CompaniesPage() {
                 }}>
                   Cancel
                 </Button>
-                <Button onClick={handleBulkImport} disabled={csvData.length === 0}>
-                  Import {csvData.length} Clients
+                <Button onClick={handleBulkImport} disabled={isImporting || csvData.length === 0}>
+                  {isImporting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    `Import ${csvData.length} Clients`
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -362,34 +506,49 @@ export default function CompaniesPage() {
                       id="company-name"
                       placeholder="Start typing to search Companies House..."
                       value={companyName}
-                      onChange={(e) => {
-                        setCompanyName(e.target.value)
-                        setSelectedFromSearch(false)
-                        searchCompaniesHouse(e.target.value)
-                      }}
+                      onChange={(e) => handleCompanyNameChange(e.target.value)}
                       onFocus={() => companySearchResults.length > 0 && setShowCompanyResults(true)}
                     />
                     {isSearching && (
                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
                     )}
                     {showCompanyResults && companySearchResults.length > 0 && (
-                      <Card className="absolute top-12 left-0 right-0 z-50 overflow-hidden">
-                        <ScrollArea className="max-h-48">
+                      <Card className="absolute top-12 left-0 right-0 z-50 overflow-hidden shadow-lg">
+                        <ScrollArea className="max-h-64">
                           {companySearchResults.map((result, i) => (
                             <button
                               key={i}
                               onClick={() => handleSelectCompanyFromSearch(result)}
-                              className="w-full flex items-center gap-3 p-3 hover:bg-muted text-left border-b border-border last:border-0"
+                              className="w-full flex items-start gap-3 p-3 hover:bg-muted text-left border-b border-border last:border-0"
                             >
-                              <Building2 className="h-4 w-4 text-muted-foreground" />
-                              <div>
+                              <Building2 className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
                                 <div className="font-medium text-sm">{result.name}</div>
                                 <div className="text-xs text-muted-foreground">{result.number}</div>
+                                {result.address && (
+                                  <div className="text-xs text-muted-foreground/70 mt-0.5 truncate">{result.address}</div>
+                                )}
+                                {result.status && (
+                                  <span className={cn(
+                                    "inline-block text-xs px-1.5 py-0.5 rounded mt-1",
+                                    result.status === 'active' 
+                                      ? "bg-emerald-500/10 text-emerald-600" 
+                                      : "bg-amber-500/10 text-amber-600"
+                                  )}>
+                                    {result.status}
+                                  </span>
+                                )}
                               </div>
                             </button>
                           ))}
                         </ScrollArea>
                       </Card>
+                    )}
+                    {searchError && (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        {searchError}
+                      </p>
                     )}
                   </div>
                   {selectedFromSearch && (
@@ -480,18 +639,34 @@ export default function CompaniesPage() {
                   </div>
                 </div>
               </div>
+              {createError && (
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 mb-4">
+                  <div className="flex items-center gap-2 text-destructive text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    {createError}
+                  </div>
+                </div>
+              )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => {
                   resetNewClientForm()
+                  setCreateError(null)
                   setNewClientOpen(false)
                 }}>
                   Cancel
                 </Button>
                 <Button
                   onClick={handleCreateClient}
-                  disabled={!companyName || !companyNumber || !utr || !contactName || !contactEmail || !contactPhone}
+                  disabled={isCreatingClient || !companyName || !companyNumber || !utr || !contactName || !contactEmail || !contactPhone}
                 >
-                  Create Client
+                  {isCreatingClient ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Client'
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -579,7 +754,12 @@ export default function CompaniesPage() {
 
       {/* Client List */}
       <div className="rounded-lg border border-border overflow-hidden">
-        {filteredClients.length === 0 ? (
+        {isLoadingClients ? (
+          <div className="p-8 text-center">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+            <p className="text-sm text-muted-foreground mt-2">Loading clients...</p>
+          </div>
+        ) : filteredClients.length === 0 ? (
           <div className="p-8 text-center">
             <Building2 className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
             <p className="font-medium text-foreground">No clients found</p>

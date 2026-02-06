@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/providers/app-provider"
-import { accountingPeriodsByCompany, type AccountingPeriod } from "@/lib/data"
+import { useAccountingPeriods } from "@/hooks/use-supabase-data"
+import { type AccountingPeriod } from "@/lib/data"
 import { type UploadedFile } from "@/lib/types"
 import {
   ChevronRight,
@@ -20,6 +21,7 @@ import {
   FileUp,
   X,
   Sparkles,
+  Loader2,
 } from "lucide-react"
 
 // Workflow steps for the claim processor
@@ -41,8 +43,25 @@ export default function PeriodWorkspacePage() {
   const periodId = params.period_id as string
   
   const client = clientList.find(c => c.id === companyId)
-  const periods = accountingPeriodsByCompany[companyId] || []
-  const period = periods.find(p => p.id === periodId)
+  
+  // Fetch accounting periods from database
+  const { data: dbPeriods, isLoading: isLoadingPeriods } = useAccountingPeriods(companyId)
+  
+  // Transform and find the period
+  const period = useMemo(() => {
+    const dbPeriod = dbPeriods.find(p => p.uuid === periodId)
+    if (!dbPeriod) return null
+    
+    return {
+      id: dbPeriod.uuid,
+      companyId: String(dbPeriod.clientCompanyId),
+      yearEnd: dbPeriod.endDate ? new Date(dbPeriod.endDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '-',
+      yearEndDate: dbPeriod.endDate ? new Date(dbPeriod.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+      periodStart: dbPeriod.startDate ? new Date(dbPeriod.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+      periodEnd: dbPeriod.endDate ? new Date(dbPeriod.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+      status: (dbPeriod.status as AccountingPeriod['status']) || 'In Progress',
+    }
+  }, [dbPeriods, periodId])
 
   // Processor state
   const [currentStep, setCurrentStep] = useState(1)
@@ -144,6 +163,17 @@ export default function PeriodWorkspacePage() {
         </button>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Company not found</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isLoadingPeriods) {
+    return (
+      <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+        <div className="text-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+          <p className="text-sm text-muted-foreground mt-2">Loading period...</p>
         </div>
       </div>
     )

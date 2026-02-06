@@ -16,18 +16,23 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/providers/app-provider"
-import { getRecentClaims, accountingPeriodsByCompany, type AccountingPeriod } from "@/lib/data"
+import { useClaimPacks, useAccountingPeriods } from "@/hooks/use-supabase-data"
+import { type AccountingPeriod } from "@/lib/data"
 import {
   ChevronRight,
   ChevronDown,
   FileText,
   Building2,
   Check,
+  Loader2,
 } from "lucide-react"
 
 export default function ClaimsPage() {
   const router = useRouter()
   const { clientList } = useApp()
+  
+  // Fetch claims from database
+  const { data: dbClaimPacks, isLoading: isLoadingClaims } = useClaimPacks()
   
   // Start Claim Dialog State
   const [startClaimOpen, setStartClaimOpen] = useState(false)
@@ -35,14 +40,40 @@ export default function ClaimsPage() {
   const [showYearEndSelection, setShowYearEndSelection] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState<AccountingPeriod | null>(null)
   
-  // Get accounting periods for selected client
+  // Get accounting periods for selected client from database (using UUID)
+  const { data: dbPeriods } = useAccountingPeriods(selectedClientForClaim?.id || null)
+  
+  // Transform database periods to UI format
   const clientPeriods = useMemo(() => {
-    if (!selectedClientForClaim) return []
-    return accountingPeriodsByCompany[selectedClientForClaim.id] || []
-  }, [selectedClientForClaim])
+    return dbPeriods.map(p => ({
+      id: p.uuid,
+      companyId: String(p.clientCompanyId),
+      yearEnd: p.endDate ? new Date(p.endDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '-',
+      yearEndDate: p.endDate ? new Date(p.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+      periodStart: p.startDate ? new Date(p.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+      periodEnd: p.endDate ? new Date(p.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+      status: (p.status as AccountingPeriod['status']) || 'In Progress',
+    }))
+  }, [dbPeriods])
 
-  // Get recent claims from accounting periods data
-  const recentClaims = useMemo(() => getRecentClaims(), [])
+  // Transform claim packs to recent claims format
+  const recentClaims = useMemo(() => {
+    return dbClaimPacks
+      .filter(c => c.status !== 'COMPLETED')
+      .map(c => {
+        const company = clientList.find(cl => cl.id === String(c.clientCompanyId))
+        return {
+          id: c.uuid,
+          companyId: String(c.clientCompanyId),
+          companyName: company?.name || 'Unknown Company',
+          yearEnd: '-',
+          status: c.status === 'IN_PROGRESS' ? 'In Progress' as const : 
+                  c.status === 'READY' ? 'Signed' as const : 
+                  c.status === 'AWAITING' ? 'Proofing' as const : 'In Progress' as const,
+          processedBy: undefined,
+        }
+      })
+  }, [dbClaimPacks, clientList])
 
   const getStatusBadge = (status: AccountingPeriod["status"]) => {
     const styles = {
@@ -147,28 +178,45 @@ export default function ClaimsPage() {
             
             {!showYearEndSelection ? (
               <div className="py-4">
-                <ScrollArea className="h-64">
-                  <div className="space-y-2">
-                    {clientList.map((client) => (
-                      <button
-                        key={client.id}
-                        onClick={() => handleSelectClientForClaim(client)}
-                        className={cn(
-                          "w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors",
-                          selectedClientForClaim?.id === client.id
-                            ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/50 hover:bg-muted/50"
-                        )}
-                      >
-                        <Building2 className="h-5 w-5 text-muted-foreground" />
-                        <div className="flex-1">
-                          <p className="font-medium text-foreground">{client.name}</p>
-                          <p className="text-xs text-muted-foreground">{client.number}</p>
-                        </div>
-                      </button>
-                    ))}
+                {clientList.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <Building2 className="h-10 w-10 text-muted-foreground mb-3" />
+                    <p className="font-medium text-foreground">No clients yet</p>
+                    <p className="text-sm text-muted-foreground mt-1 mb-4">Add a client to get started with a claim</p>
+                    <Button
+                      onClick={() => {
+                        setStartClaimOpen(false)
+                        router.push('/companies')
+                      }}
+                    >
+                      <Building2 className="h-4 w-4 mr-2" />
+                      Add Client
+                    </Button>
                   </div>
-                </ScrollArea>
+                ) : (
+                  <ScrollArea className="h-64">
+                    <div className="space-y-2">
+                      {clientList.map((client) => (
+                        <button
+                          key={client.id}
+                          onClick={() => handleSelectClientForClaim(client)}
+                          className={cn(
+                            "w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors",
+                            selectedClientForClaim?.id === client.id
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50 hover:bg-muted/50"
+                          )}
+                        >
+                          <Building2 className="h-5 w-5 text-muted-foreground" />
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground">{client.name}</p>
+                            <p className="text-xs text-muted-foreground">{client.number}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
               </div>
             ) : (
               <div className="py-4 space-y-4">
@@ -258,20 +306,33 @@ export default function ClaimsPage() {
           
           {/* Table Rows */}
           <div className="divide-y divide-border">
-            {recentClaims.map((claim) => (
-              <button
-                key={claim.id}
-                onClick={() => router.push(`/companies/${claim.companyId}/periods/${claim.id}`)}
-                className="w-full grid grid-cols-[1fr_140px_100px_100px] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors cursor-pointer text-left"
-              >
-                <span className="font-medium text-foreground truncate">{claim.companyName}</span>
-                <span className="text-sm text-muted-foreground truncate">{claim.processedBy || "-"}</span>
-                <span className="text-sm text-muted-foreground">{claim.yearEnd}</span>
-                <Badge variant="outline" className={cn("w-fit text-xs", getStatusBadge(claim.status))}>
-                  {claim.status}
-                </Badge>
-              </button>
-            ))}
+            {isLoadingClaims ? (
+              <div className="p-8 text-center">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mt-2">Loading claims...</p>
+              </div>
+            ) : recentClaims.length === 0 ? (
+              <div className="p-8 text-center">
+                <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="font-medium text-foreground">No claims yet</p>
+                <p className="text-sm text-muted-foreground">Start a claim to get started</p>
+              </div>
+            ) : (
+              recentClaims.map((claim) => (
+                <button
+                  key={claim.id}
+                  onClick={() => router.push(`/companies/${claim.companyId}/periods/${claim.id}`)}
+                  className="w-full grid grid-cols-[1fr_140px_100px_100px] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors cursor-pointer text-left"
+                >
+                  <span className="font-medium text-foreground truncate">{claim.companyName}</span>
+                  <span className="text-sm text-muted-foreground truncate">{claim.processedBy || "-"}</span>
+                  <span className="text-sm text-muted-foreground">{claim.yearEnd}</span>
+                  <Badge variant="outline" className={cn("w-fit text-xs", getStatusBadge(claim.status))}>
+                    {claim.status}
+                  </Badge>
+                </button>
+              ))
+            )}
           </div>
         </div>
       </div>

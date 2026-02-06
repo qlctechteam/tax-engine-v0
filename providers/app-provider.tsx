@@ -1,14 +1,17 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback } from "react"
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react"
 import { AppNotification, Company } from "@/lib/types"
-import { companies as initialCompanies } from "@/lib/data"
+import { useClientCompanies, useGovernmentGateway, DbClientCompany } from "@/hooks/use-supabase-data"
 
 interface AppContextType {
   // Company state
   clientList: Company[]
+  isLoadingClients: boolean
+  clientsError: string | null
   addClient: (client: Company) => void
   bulkAddClients: (clients: Company[]) => void
+  refetchClients: () => void
   
   // Notifications
   notifications: AppNotification[]
@@ -22,15 +25,46 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
+// Transform database company to UI company format
+function transformCompany(dbCompany: DbClientCompany): Company {
+  return {
+    id: dbCompany.uuid, // Use UUID as the ID for URLs
+    name: dbCompany.companyName,
+    number: dbCompany.companyNumber || '',
+    utr: dbCompany.utr || undefined,
+    payeReference: dbCompany.payeReference || undefined,
+    contactEmail: dbCompany.email || undefined,
+    contactPhone: dbCompany.phone || undefined,
+  }
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  // Company state
-  const [clientList, setClientList] = useState<Company[]>(initialCompanies)
+  // Fetch companies from database
+  const { 
+    data: dbCompanies, 
+    isLoading: isLoadingClients, 
+    error: clientsError,
+    refetch: refetchClients 
+  } = useClientCompanies()
+  
+  // Fetch gateway status
+  const { data: gateway } = useGovernmentGateway()
+  
+  // Transform database companies to UI format
+  const [clientList, setClientList] = useState<Company[]>([])
+  
+  useEffect(() => {
+    if (dbCompanies.length > 0) {
+      setClientList(dbCompanies.map(transformCompany))
+    }
+  }, [dbCompanies])
   
   // Notifications state
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   
-  // Gateway connection state
-  const [isGatewayConnected, setGatewayConnected] = useState(true)
+  // Gateway connection state - derived from database
+  const isGatewayConnected = gateway?.status === 'CONNECTED'
+  const [, setGatewayConnected] = useState(true)
 
   const addClient = useCallback((client: Company) => {
     setClientList((prev) => [...prev, client])
@@ -59,8 +93,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppContext.Provider value={{
       clientList,
+      isLoadingClients,
+      clientsError,
       addClient,
       bulkAddClients,
+      refetchClients,
       notifications,
       addNotification,
       markNotificationRead,

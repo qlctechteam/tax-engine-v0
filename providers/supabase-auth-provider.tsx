@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react"
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
 import { getSupabaseClient } from "@/lib/supabase"
 import type { User, Session } from "@supabase/supabase-js"
 import type { TaxEngineUser } from "@/lib/supabase/database.types"
@@ -31,76 +31,122 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
   const [profile, setProfile] = useState<TaxEngineUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isProfileLoading, setIsProfileLoading] = useState(false)
+  
+  // Track if component is mounted to avoid state updates after unmount
+  const isMountedRef = useRef(true)
 
   const supabase = getSupabaseClient()
 
   // Fetch the user's TaxEngine profile (or create one if it doesn't exist)
+  // This is non-blocking - the app will work even without a profile
   const fetchProfile = useCallback(async (userId: string, userEmail?: string) => {
+    if (!isMountedRef.current) return null
+    
     setIsProfileLoading(true)
     try {
+      console.log('Fetching profile for user:', userId)
+      
       const { data, error } = await supabase
         .from('TaxEngineUsers')
         .select('*')
         .eq('uuid', userId)
         .single()
 
+      if (!isMountedRef.current) return null
+
       if (error) {
         // PGRST116 = "No rows found" - user profile doesn't exist yet
         if (error.code === 'PGRST116' && userEmail) {
-          console.log('Profile not found, creating new profile for user:', userId)
+          console.log('Profile not found, creating via API for user:', userId)
           
-          // Auto-create the profile
-          const { data: newProfile, error: insertError } = await supabase
-            .from('TaxEngineUsers')
-            .insert({
-              uuid: userId,
-              email: userEmail,
-              role: 'CLAIM_PROCESSOR',
-              status: 'ACTIVE',
+          // Use API route to create profile (uses service_role key to bypass RLS)
+          try {
+            const response = await fetch('/api/auth/create-profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId, userEmail }),
             })
-            .select()
-            .single()
-
-          if (insertError) {
-            console.error('Error creating profile:', insertError.message, insertError.code, insertError.details)
+            
+            const result = await response.json()
+            
+            if (!isMountedRef.current) return null
+            
+            if (!response.ok) {
+              console.error('Error creating profile via API:', result.error)
+              return null
+            }
+            
+            console.log('Profile created successfully:', result.profile)
+            setProfile(result.profile)
+            return result.profile
+          } catch (apiError) {
+            console.error('Error calling create-profile API:', apiError)
             return null
           }
-
-          setProfile(newProfile)
-          return newProfile
         }
 
-        // Log the actual error details
+        // Log the actual error details but don't block the app
         console.error('Error fetching profile:', error.message, error.code, error.details)
+        console.warn('Continuing without profile - app will work in degraded mode')
         return null
       }
+      
+      console.log('Profile fetched successfully:', data)
       setProfile(data)
       return data
     } catch (err) {
       console.error('Error fetching profile:', err)
+      console.warn('Continuing without profile - app will work in degraded mode')
       return null
     } finally {
-      setIsProfileLoading(false)
+      if (isMountedRef.current) {
+        setIsProfileLoading(false)
+      }
     }
   }, [supabase])
 
-  // Initialize auth state
+  // Initialize auth state - only runs once on mount
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        // Get initial session
-        const { data: { session: initialSession } } = await supabase.auth.getSession()
-        setSession(initialSession)
-        setUser(initialSession?.user ?? null)
+    let isCancelled = false
+    isMountedRef.current = true
 
-        // Fetch profile if user exists
-        if (initialSession?.user) {
-          await fetchProfile(initialSession.user.id, initialSession.user.email)
+    const initAuth = async () => {
+      console.log('Initializing auth...')
+      try {
+        // Use getUser() to validate the session (getSession() can return stale data)
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
+        
+        if (isCancelled) return
+
+        if (error) {
+          console.log('No valid session:', error.message)
+          setUser(null)
+          setSession(null)
+          setProfile(null)
+          setIsLoading(false)
+          return
+        }
+
+        if (currentUser) {
+          console.log('User found:', currentUser.email)
+          // Get the full session
+          const { data: { session: currentSession } } = await supabase.auth.getSession()
+          
+          if (isCancelled) return
+          
+          setSession(currentSession)
+          setUser(currentUser)
+          
+          // Fetch profile (non-blocking - don't await to avoid holding up the UI)
+          fetchProfile(currentUser.id, currentUser.email)
         }
       } catch (err) {
         console.error('Error initializing auth:', err)
       } finally {
-        setIsLoading(false)
+        if (!isCancelled) {
+          console.log('Auth initialization complete')
+          setIsLoading(false)
+        }
       }
     }
 
@@ -108,12 +154,20 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
+      (event, newSession) => {
+        if (isCancelled) return
+
+        console.log('Auth state change:', event)
+        
         setSession(newSession)
         setUser(newSession?.user ?? null)
 
-        if (event === 'SIGNED_IN' && newSession?.user) {
-          await fetchProfile(newSession.user.id, newSession.user.email)
+        // Handle various auth events
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (newSession?.user) {
+            // Non-blocking profile fetch
+            fetchProfile(newSession.user.id, newSession.user.email)
+          }
         } else if (event === 'SIGNED_OUT') {
           setProfile(null)
         }
@@ -121,9 +175,12 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
     )
 
     return () => {
+      isCancelled = true
+      isMountedRef.current = false
       subscription.unsubscribe()
     }
-  }, [supabase, fetchProfile])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty dependency array - only run once on mount
 
   // Sign in with email and password
   const signInWithEmail = useCallback(async (email: string, password: string) => {
@@ -137,12 +194,21 @@ export function SupabaseAuthProvider({ children }: { children: React.ReactNode }
         return { success: false, error: error.message }
       }
 
-      // Update last login in profile
+      // Track login via API (updates lastLoginAt and creates audit log)
       if (data.user) {
-        await supabase
-          .from('TaxEngineUsers')
-          .update({ lastLoginAt: new Date().toISOString() })
-          .eq('uuid', data.user.id)
+        try {
+          await fetch('/api/auth/track-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: data.user.id,
+              userEmail: data.user.email,
+            }),
+          })
+        } catch (trackError) {
+          // Don't fail login if tracking fails
+          console.error('Failed to track login:', trackError)
+        }
       }
 
       return { success: true }

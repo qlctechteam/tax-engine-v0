@@ -27,7 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { users, rolePermissions, auditLog, templates, governmentGateway, submissionPermissions } from "@/lib/data"
+import { rolePermissions, templates, governmentGateway, submissionPermissions } from "@/lib/data"
+import { useTaxEngineUsers, useAuditLogs } from "@/hooks/use-supabase-data"
 import {
   Users,
   Bell,
@@ -55,15 +56,30 @@ import {
   Eye,
   EyeOff,
   X,
+  Loader2,
+  AlertCircle,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 
 function UsersPanel() {
+  const { data: dbUsers, isLoading } = useTaxEngineUsers()
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<"Administrator" | "Claim Processor">("Claim Processor")
   const [inviteName, setInviteName] = useState("")
   const [inviteSent, setInviteSent] = useState(false)
+
+  // Transform database users to UI format
+  const users = dbUsers.map(u => ({
+    id: u.uuid,
+    name: [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email.split('@')[0],
+    email: u.email,
+    role: u.role === 'ADMINISTRATOR' ? 'Administrator' : 'Claim Processor',
+    status: u.status === 'ACTIVE' ? 'Active' : 'Inactive',
+    lastLogin: u.lastLoginAt 
+      ? new Date(u.lastLoginAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : 'Never',
+  }))
 
   const handleSendInvite = () => {
     setInviteSent(true)
@@ -178,51 +194,64 @@ function UsersPanel() {
           <span>Last Login</span>
           <span></span>
         </div>
-        {users.map((user) => (
-          <div key={user.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 p-3 items-center border-b border-border last:border-0">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
-                {user.name.split(" ").map(n => n[0]).join("")}
-              </div>
-              <div className="min-w-0">
-                <p className="font-medium text-foreground truncate">{user.name}</p>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Mail className="h-3 w-3" />
-                  <span className="truncate">{user.email}</span>
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+            <p className="text-sm text-muted-foreground mt-2">Loading users...</p>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="p-8 text-center">
+            <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <p className="font-medium text-foreground">No users yet</p>
+            <p className="text-sm text-muted-foreground">Invite a team member to get started</p>
+          </div>
+        ) : (
+          users.map((user) => (
+            <div key={user.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 p-3 items-center border-b border-border last:border-0">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
+                  {user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground truncate">{user.name}</p>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Mail className="h-3 w-3" />
+                    <span className="truncate">{user.email}</span>
+                  </div>
                 </div>
               </div>
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-xs",
+                  user.role === "Administrator" 
+                    ? "bg-primary/10 text-primary border-primary/20" 
+                    : "bg-muted text-muted-foreground border-border"
+                )}
+              >
+                {user.role}
+              </Badge>
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-xs",
+                  user.status === "Active" 
+                    ? "text-emerald-600 border-emerald-500/20" 
+                    : "text-muted-foreground border-border"
+                )}
+              >
+                {user.status}
+              </Badge>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                <Clock className="h-3 w-3" />
+                <span>{user.lastLogin}</span>
+              </div>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
             </div>
-            <Badge 
-              variant="outline" 
-              className={cn(
-                "text-xs",
-                user.role === "Administrator" 
-                  ? "bg-primary/10 text-primary border-primary/20" 
-                  : "bg-muted text-muted-foreground border-border"
-              )}
-            >
-              {user.role}
-            </Badge>
-            <Badge 
-              variant="outline" 
-              className={cn(
-                "text-xs",
-                user.status === "Active" 
-                  ? "text-emerald-600 border-emerald-500/20" 
-                  : "text-muted-foreground border-border"
-              )}
-            >
-              {user.status}
-            </Badge>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
-              <Clock className="h-3 w-3" />
-              <span>{user.lastLogin}</span>
-            </div>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   )
@@ -344,16 +373,41 @@ function NotificationsPanel() {
 }
 
 function AuditLogPanel() {
+  const { data: dbAuditLogs, isLoading, error: auditError } = useAuditLogs({ limit: 50 })
+  
+  // Log error for debugging
+  if (auditError) {
+    console.error('AuditLogPanel error:', auditError)
+  }
+
   const getCategoryBadge = (category: string) => {
     const styles: Record<string, string> = {
-      auth: "bg-sky-500/10 text-sky-600 border-sky-500/20",
-      claim: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-      client: "bg-violet-500/10 text-violet-600 border-violet-500/20",
-      submission: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-      settings: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+      AUTH: "bg-sky-500/10 text-sky-600 border-sky-500/20",
+      CLAIM: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+      CLIENT: "bg-violet-500/10 text-violet-600 border-violet-500/20",
+      SUBMISSION: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+      SETTINGS: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+      USER: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
+      DOCUMENT: "bg-orange-500/10 text-orange-600 border-orange-500/20",
     }
     return styles[category] || "bg-muted text-muted-foreground"
   }
+
+  // Transform database audit logs to UI format
+  const auditEntries = dbAuditLogs.map(log => ({
+    id: log.uuid,
+    action: log.action,
+    details: log.details || '',
+    category: log.category,
+    timestamp: new Date(log.timestamp).toLocaleDateString('en-GB', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }),
+    user: 'System', // TODO: Could join with user table to get the actual user name
+  }))
 
   return (
     <div className="space-y-4">
@@ -370,30 +424,46 @@ function AuditLogPanel() {
       
       <div className="border border-border rounded-lg overflow-hidden">
         <div className="divide-y divide-border">
-          {auditLog.map((entry) => (
-            <div key={entry.id} className="flex gap-6 p-4 hover:bg-muted/30 transition-colors">
-              {/* Timestamp */}
-              <div className="flex-shrink-0 w-36">
-                <span className="text-sm text-muted-foreground whitespace-nowrap">
-                  {entry.timestamp}
-                </span>
-              </div>
-              
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium text-foreground">{entry.action}</span>
-                  <Badge variant="outline" className={cn("text-xs", getCategoryBadge(entry.category))}>
-                    {entry.category}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">{entry.details}</p>
-                <p className="text-xs text-muted-foreground/70 mt-1">
-                  by {entry.user}
-                </p>
-              </div>
+          {isLoading ? (
+            <div className="p-8 text-center">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground mt-2">Loading audit log...</p>
             </div>
-          ))}
+          ) : auditError ? (
+            <div className="p-8 text-center">
+              <AlertCircle className="h-8 w-8 mx-auto mb-2 text-destructive" />
+              <p className="font-medium text-foreground">Failed to load audit log</p>
+              <p className="text-sm text-muted-foreground">{auditError}</p>
+            </div>
+          ) : auditEntries.length === 0 ? (
+            <div className="p-8 text-center">
+              <ScrollText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="font-medium text-foreground">No activity yet</p>
+              <p className="text-sm text-muted-foreground">System events will appear here</p>
+            </div>
+          ) : (
+            auditEntries.map((entry) => (
+              <div key={entry.id} className="flex gap-6 p-4 hover:bg-muted/30 transition-colors">
+                {/* Timestamp */}
+                <div className="flex-shrink-0 w-36">
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    {entry.timestamp}
+                  </span>
+                </div>
+                
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium text-foreground">{entry.action}</span>
+                    <Badge variant="outline" className={cn("text-xs", getCategoryBadge(entry.category))}>
+                      {entry.category.toLowerCase()}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{entry.details}</p>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

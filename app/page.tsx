@@ -1,10 +1,9 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useApp } from "@/providers/app-provider"
+import { useClaimPacks, useSubmissions } from "@/hooks/use-supabase-data"
 import {
   FileText,
   Briefcase,
@@ -15,6 +14,15 @@ import {
 export default function HomePage() {
   const router = useRouter()  
   const { clientList } = useApp()
+  
+  // Fetch real counts from database
+  const { data: claims } = useClaimPacks()
+  const { data: submissions } = useSubmissions()
+  
+  // Count active claims (not completed)
+  const activeClaimsCount = claims.filter(c => c.status !== 'COMPLETED').length
+  // Count pending submissions (not accepted)
+  const pendingSubmissionsCount = submissions.filter(s => s.status === 'PENDING_RESPONSE' || s.status === 'SUBMITTED').length
 
   // Navigation card component
   const NavCard = ({ 
@@ -79,7 +87,7 @@ export default function HomePage() {
           icon={FileText}
           title="Claims"
           description="Process and manage R&D claims"
-          count={7}
+          count={activeClaimsCount}
           countLabel="active"
           onClick={() => router.push("/claims")}
         />
@@ -95,7 +103,7 @@ export default function HomePage() {
           icon={Send}
           title="Submissions"
           description="Track HMRC submissions"
-          count={3}
+          count={pendingSubmissionsCount}
           countLabel="pending"
           onClick={() => router.push("/submissions")}
         />

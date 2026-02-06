@@ -124,7 +124,7 @@ export default function ReviewPage() {
           Back
         </button>
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Data not found</p>
+          <p className="text-muted-foreground">Page work in progress</p>
         </div>
       </div>
     )

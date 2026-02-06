@@ -16,11 +16,13 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/providers/app-provider"
+import { useSubmissions, useClaimPacks } from "@/hooks/use-supabase-data"
 import {
   Search,
   ChevronRight,
   FileText,
   Download,
+  Loader2,
 } from "lucide-react"
 
 export default function SubmissionsPage() {
@@ -30,23 +32,36 @@ export default function SubmissionsPage() {
   const [startSubmissionOpen, setStartSubmissionOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Simulated submitted claims (sorted by date, most recent first)
-  const submittedClaims = useMemo(() => [
-    { id: "sc1", company: "Quantum Dynamics Ltd", claimName: "FY 2023/24", dateSubmitted: "15 Jan 2024", status: "Submitted" as const, submittedBy: "Sarah Mitchell" },
-    { id: "sc2", company: "Nova Engineering", claimName: "FY 2023/24", dateSubmitted: "12 Jan 2024", status: "Submitted" as const, submittedBy: "James Cooper" },
-    { id: "sc3", company: "TechForward Solutions", claimName: "FY 2022/23", dateSubmitted: "8 Jan 2024", status: "Submitted" as const, submittedBy: "Emily Chen" },
-    { id: "sc4", company: "Meridian Research", claimName: "FY 2023/24", dateSubmitted: "5 Jan 2024", status: "Submitted" as const, submittedBy: "Sarah Mitchell" },
-    { id: "sc5", company: "BlueWave Analytics", claimName: "FY 2022/23", dateSubmitted: "28 Dec 2023", status: "Submitted" as const, submittedBy: "Michael Torres" },
-    { id: "sc6", company: "Precision Labs", claimName: "FY 2023/24", dateSubmitted: "20 Dec 2023", status: "Submitted" as const, submittedBy: "James Cooper" },
-  ], [])
+  // Fetch submissions from database
+  const { data: dbSubmissions, isLoading: isLoadingSubmissions } = useSubmissions()
+  const { data: dbClaimPacks, isLoading: isLoadingClaims } = useClaimPacks()
 
-  // Simulated claims ready for submission (processed but not yet submitted)
-  const claimsReadyForSubmission = useMemo(() => [
-    { id: "crs1", company: "Vertex Innovations", claimName: "R&D Tax Credit FY 2024/25", yearEnd: "Mar 2025", amount: "£52,340" },
-    { id: "crs2", company: "Apex Technologies", claimName: "R&D Tax Credit FY 2023/24", yearEnd: "Dec 2024", amount: "£41,200" },
-    { id: "crs3", company: "Horizon Digital", claimName: "R&D Tax Credit FY 2024/25", yearEnd: "Sep 2024", amount: "£38,900" },
-    { id: "crs4", company: "Stellar Systems", claimName: "R&D Tax Credit FY 2023/24", yearEnd: "Jun 2024", amount: "£29,750" },
-  ], [])
+  // Transform database submissions to display format
+  const submittedClaims = useMemo(() => {
+    return dbSubmissions
+      .filter(s => s.status === 'SUBMITTED' || s.status === 'ACCEPTED')
+      .map(s => ({
+        id: s.uuid,
+        company: clientList.find(c => c.id === String(s.clientCompanyId))?.name || 'Unknown Company',
+        claimName: s.title,
+        dateSubmitted: s.submittedAt ? new Date(s.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '-',
+        status: s.status as 'Submitted',
+        submittedBy: 'System', // Would need to join with users table
+      }))
+  }, [dbSubmissions, clientList])
+
+  // Claims ready for submission (status = READY in ClaimPacks)
+  const claimsReadyForSubmission = useMemo(() => {
+    return dbClaimPacks
+      .filter(c => c.currentStage === 'SUBMIT' || c.status === 'READY')
+      .map(c => ({
+        id: c.uuid,
+        company: clientList.find(cl => cl.id === String(c.clientCompanyId))?.name || 'Unknown Company',
+        claimName: c.title,
+        yearEnd: '-',
+        amount: '-',
+      }))
+  }, [dbClaimPacks, clientList])
 
   const filteredClaimsForSubmission = useMemo(() => {
     if (!searchQuery.trim()) return claimsReadyForSubmission
@@ -169,45 +184,58 @@ export default function SubmissionsPage() {
           
           {/* Table Rows */}
           <div className="divide-y divide-border">
-            {submittedClaims.map((claim) => {
-              // Find matching client for navigation
-              const matchingClient = clientList?.find(c => c.name === claim.company)
-              
-              return (
-                <div
-                  key={claim.id}
-                  className="grid grid-cols-[1fr_1fr_120px_100px_80px] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors"
-                >
-                  <div className="min-w-0">
-                    <button
-                      onClick={() => handleCompanyClick(claim.company)}
-                      className={cn(
-                        "font-medium truncate text-left transition-colors focus-visible:outline-none focus-visible:underline block",
-                        matchingClient ? "text-foreground hover:text-primary cursor-pointer" : "text-foreground cursor-default"
-                      )}
-                      disabled={!matchingClient}
-                    >
-                      {claim.company}
-                    </button>
-                    <p className="text-xs text-muted-foreground truncate">{claim.submittedBy}</p>
-                  </div>
-                  <span className="text-sm text-muted-foreground truncate">{claim.claimName}</span>
-                  <span className="text-sm text-muted-foreground">{claim.dateSubmitted}</span>
-                  <Badge variant="outline" className="w-fit text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
-                    {claim.status}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => handleDownloadReceipt(claim)}
-                    title={`Download HMRC Receipt for ${claim.company}`}
+            {isLoadingSubmissions ? (
+              <div className="p-8 text-center">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mt-2">Loading submissions...</p>
+              </div>
+            ) : submittedClaims.length === 0 ? (
+              <div className="p-8 text-center">
+                <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="font-medium text-foreground">No submissions yet</p>
+                <p className="text-sm text-muted-foreground">Submitted claims will appear here</p>
+              </div>
+            ) : (
+              submittedClaims.map((claim) => {
+                // Find matching client for navigation
+                const matchingClient = clientList?.find(c => c.name === claim.company)
+                
+                return (
+                  <div
+                    key={claim.id}
+                    className="grid grid-cols-[1fr_1fr_120px_100px_80px] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors"
                   >
-                    <Download className="h-4 w-4 text-muted-foreground" />
-                  </Button>
-                </div>
-              )
-            })}
+                    <div className="min-w-0">
+                      <button
+                        onClick={() => handleCompanyClick(claim.company)}
+                        className={cn(
+                          "font-medium truncate text-left transition-colors focus-visible:outline-none focus-visible:underline block",
+                          matchingClient ? "text-foreground hover:text-primary cursor-pointer" : "text-foreground cursor-default"
+                        )}
+                        disabled={!matchingClient}
+                      >
+                        {claim.company}
+                      </button>
+                      <p className="text-xs text-muted-foreground truncate">{claim.submittedBy}</p>
+                    </div>
+                    <span className="text-sm text-muted-foreground truncate">{claim.claimName}</span>
+                    <span className="text-sm text-muted-foreground">{claim.dateSubmitted}</span>
+                    <Badge variant="outline" className="w-fit text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                      {claim.status}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => handleDownloadReceipt(claim)}
+                      title={`Download HMRC Receipt for ${claim.company}`}
+                    >
+                      <Download className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                )
+              })
+            )}
           </div>
         </div>
       </div>

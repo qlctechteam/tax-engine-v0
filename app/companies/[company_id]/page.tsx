@@ -1,11 +1,13 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/providers/app-provider"
+import { useClaimPacks } from "@/hooks/use-supabase-data"
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,51 +15,79 @@ import {
   Phone,
   Download,
   FileText,
+  Loader2,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react"
 
 export default function CompanyDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const { clientList } = useApp()
+  const { clientList, refetchClients } = useApp()
   
   const companyId = params.company_id as string
   const client = clientList.find(c => c.id === companyId)
+  
+  // UTR edit state
+  const [isEditingUtr, setIsEditingUtr] = useState(false)
+  const [utrValue, setUtrValue] = useState(client?.utr || "")
+  const [isSavingUtr, setIsSavingUtr] = useState(false)
+  
+  // Handle UTR save
+  const handleSaveUtr = async () => {
+    if (!client) return
+    
+    setIsSavingUtr(true)
+    try {
+      const response = await fetch(`/api/clients/${companyId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ utr: utrValue }),
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to update UTR')
+      }
+      
+      // Refresh client list to get updated data
+      refetchClients()
+      setIsEditingUtr(false)
+    } catch (error) {
+      console.error('Error saving UTR:', error)
+    } finally {
+      setIsSavingUtr(false)
+    }
+  }
+  
+  // Cancel UTR edit
+  const handleCancelUtrEdit = () => {
+    setUtrValue(client?.utr || "")
+    setIsEditingUtr(false)
+  }
 
-  // Mock historical claims data
-  const historicalClaims = useMemo(() => [
-    {
-      id: "hc1",
-      name: "R&D Tax Credit FY 2023/24",
-      status: "Submitted" as const,
-      submittedDate: "15 Jan 2024",
-      yearEnd: "Mar 2024",
-      amount: "£45,230",
-    },
-    {
-      id: "hc2",
-      name: "R&D Tax Credit FY 2022/23",
-      status: "Issued" as const,
-      submittedDate: "20 Feb 2023",
-      yearEnd: "Mar 2023",
-      amount: "£38,500",
-    },
-    {
-      id: "hc3",
-      name: "R&D Tax Credit FY 2021/22",
-      status: "Signed" as const,
-      submittedDate: "18 Mar 2022",
-      yearEnd: "Mar 2022",
-      amount: "£32,100",
-    },
-    {
-      id: "hc4",
-      name: "R&D Tax Credit FY 2024/25",
-      status: "In Progress" as const,
-      submittedDate: null,
-      yearEnd: "Mar 2025",
-      amount: "TBD",
-    },
-  ], [])
+  // Fetch claims from database
+  const { data: dbClaimPacks, isLoading: isLoadingClaims } = useClaimPacks()
+
+  // Filter and transform claims for this company
+  const historicalClaims = useMemo(() => {
+    if (!client) return []
+    
+    return dbClaimPacks
+      .filter(claim => String(claim.clientCompanyId) === companyId || claim.clientCompanyUuid === companyId)
+      .map(claim => ({
+        id: claim.uuid,
+        name: `R&D Tax Credit Claim`,
+        status: claim.status === 'COMPLETED' ? 'Submitted' as const :
+                claim.status === 'READY' ? 'Signed' as const :
+                claim.status === 'IN_PROGRESS' ? 'In Progress' as const : 'In Progress' as const,
+        submittedDate: claim.submittedAt 
+          ? new Date(claim.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+          : null,
+        yearEnd: '-',
+        amount: claim.creditAmount ? `£${claim.creditAmount.toLocaleString()}` : 'TBD',
+      }))
+  }, [dbClaimPacks, companyId, client])
 
   const getStatusBadge = (status: "In Progress" | "Issued" | "Signed" | "Submitted") => {
     const styles = {
@@ -103,8 +133,56 @@ export default function CompanyDetailPage() {
             <p className="text-muted-foreground">{client.number}</p>
           </div>
           <div className="text-right text-sm">
-            <p className="text-muted-foreground">UTR</p>
-            <p className="font-mono text-foreground">{client.utr || "-"}</p>
+            <p className="text-muted-foreground mb-1">UTR</p>
+            {isEditingUtr ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="text"
+                  value={utrValue}
+                  onChange={(e) => setUtrValue(e.target.value)}
+                  placeholder="Enter UTR"
+                  className="h-8 w-32 font-mono text-sm"
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                  onClick={handleSaveUtr}
+                  disabled={isSavingUtr}
+                >
+                  {isSavingUtr ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={handleCancelUtrEdit}
+                  disabled={isSavingUtr}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <p className="font-mono text-foreground">{client.utr || "-"}</p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setUtrValue(client.utr || "")
+                    setIsEditingUtr(true)
+                  }}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -137,27 +215,40 @@ export default function CompanyDetailPage() {
           
           {/* Table Rows */}
           <div className="divide-y divide-border">
-            {historicalClaims.map((claim) => (
-              <div
-                key={claim.id}
-                className="grid grid-cols-[1fr_100px_100px_100px_80px] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors"
-              >
-                <div>
-                  <p className="font-medium text-foreground text-sm">{claim.name}</p>
-                  <p className="text-xs text-muted-foreground">{claim.amount}</p>
-                </div>
-                <span className="text-sm text-muted-foreground">{claim.yearEnd}</span>
-                <Badge variant="outline" className={cn("w-fit text-xs", getStatusBadge(claim.status))}>
-                  {claim.status}
-                </Badge>
-                <span className="text-sm text-muted-foreground">
-                  {claim.submittedDate || "-"}
-                </span>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <Download className="h-4 w-4" />
-                </Button>
+            {isLoadingClaims ? (
+              <div className="p-8 text-center">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mt-2">Loading claims...</p>
               </div>
-            ))}
+            ) : historicalClaims.length === 0 ? (
+              <div className="p-8 text-center">
+                <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="font-medium text-foreground">No claims yet</p>
+                <p className="text-sm text-muted-foreground">Process a claim to see it here</p>
+              </div>
+            ) : (
+              historicalClaims.map((claim) => (
+                <div
+                  key={claim.id}
+                  className="grid grid-cols-[1fr_100px_100px_100px_80px] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors"
+                >
+                  <div>
+                    <p className="font-medium text-foreground text-sm">{claim.name}</p>
+                    <p className="text-xs text-muted-foreground">{claim.amount}</p>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{claim.yearEnd}</span>
+                  <Badge variant="outline" className={cn("w-fit text-xs", getStatusBadge(claim.status))}>
+                    {claim.status}
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {claim.submittedDate || "-"}
+                  </span>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

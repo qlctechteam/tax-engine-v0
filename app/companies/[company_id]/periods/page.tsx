@@ -1,11 +1,23 @@
 "use client"
 
+import { useMemo, useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/providers/app-provider"
-import { accountingPeriodsByCompany, type AccountingPeriod } from "@/lib/data"
+import { useAccountingPeriods, useClientCompany } from "@/hooks/use-supabase-data"
+import { type AccountingPeriod } from "@/lib/data"
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,6 +25,7 @@ import {
   FileText,
   Calendar,
   User,
+  Loader2,
 } from "lucide-react"
 
 export default function PeriodsPage() {
@@ -22,7 +35,107 @@ export default function PeriodsPage() {
   
   const companyId = params.company_id as string
   const client = clientList.find(c => c.id === companyId)
-  const periods = accountingPeriodsByCompany[companyId] || []
+  
+  // Fetch company details to get year end
+  const { data: dbCompany } = useClientCompany(companyId)
+  
+  // Fetch accounting periods from database
+  const { data: dbPeriods, isLoading: isLoadingPeriods, refetch: refetchPeriods } = useAccountingPeriods(companyId)
+  
+  // Modal state
+  const [showNewPeriodModal, setShowNewPeriodModal] = useState(false)
+  const [startDate, setStartDate] = useState("")
+  const [endDate, setEndDate] = useState("")
+  const [isCreating, setIsCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  
+  // Auto-fill end date based on company year end
+  useEffect(() => {
+    if (showNewPeriodModal && dbCompany?.companyYearEndMonth && dbCompany?.companyYearEndDay) {
+      const currentDate = new Date()
+      const currentYear = currentDate.getFullYear()
+      
+      // Calculate next year end from today
+      const thisYearEnd = new Date(currentYear, dbCompany.companyYearEndMonth - 1, dbCompany.companyYearEndDay)
+      let nextYearEnd = thisYearEnd
+      
+      if (currentDate > thisYearEnd) {
+        // If we've passed this year's year end, use next year's
+        nextYearEnd = new Date(currentYear + 1, dbCompany.companyYearEndMonth - 1, dbCompany.companyYearEndDay)
+      }
+      
+      // Calculate start date (day after previous year end)
+      const periodStartDate = new Date(nextYearEnd)
+      periodStartDate.setFullYear(periodStartDate.getFullYear() - 1)
+      periodStartDate.setDate(periodStartDate.getDate() + 1)
+      
+      // Format as YYYY-MM-DD for input
+      const formatDateForInput = (date: Date) => {
+        return date.toISOString().split('T')[0]
+      }
+      
+      setEndDate(formatDateForInput(nextYearEnd))
+      setStartDate(formatDateForInput(periodStartDate))
+    }
+  }, [showNewPeriodModal, dbCompany])
+  
+  // Reset modal state
+  const resetModal = () => {
+    setStartDate("")
+    setEndDate("")
+    setCreateError(null)
+    setShowNewPeriodModal(false)
+  }
+  
+  // Handle create period
+  const handleCreatePeriod = async () => {
+    if (!startDate || !endDate) {
+      setCreateError("Please select both start and end dates")
+      return
+    }
+    
+    setIsCreating(true)
+    setCreateError(null)
+    
+    try {
+      const response = await fetch('/api/accounting-periods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientCompanyUuid: companyId,
+          startDate,
+          endDate,
+        }),
+      })
+      
+      const result = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create period')
+      }
+      
+      // Refresh the periods list
+      refetchPeriods()
+      resetModal()
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Failed to create period')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+  
+  // Transform database periods to UI format
+  const periods = useMemo(() => {
+    return dbPeriods.map(p => ({
+      id: p.uuid,
+      companyId: String(p.clientCompanyId),
+      yearEnd: p.endDate ? new Date(p.endDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }) : '-',
+      yearEndDate: p.endDate ? new Date(p.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+      periodStart: p.startDate ? new Date(p.startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+      periodEnd: p.endDate ? new Date(p.endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-',
+      status: (p.status as AccountingPeriod['status']) || 'In Progress',
+    }))
+  }, [dbPeriods])
 
   const getStatusBadge = (status: AccountingPeriod["status"]) => {
     const styles = {
@@ -70,6 +183,7 @@ export default function PeriodsPage() {
           </div>
           <Button
             size="sm"
+            onClick={() => setShowNewPeriodModal(true)}
             className="group h-9 px-4 text-sm tracking-tight text-primary-foreground font-semibold rounded-lg border-t border-t-white/20 border-b-2 border-b-black/15 border-x border-x-white/10 bg-gradient-to-b from-primary/90 to-primary hover:from-primary/80 hover:to-primary hover:shadow-[0_4px_0_0_rgba(0,0,0,0.15),0_6px_12px_-2px_rgba(0,0,0,0.3),0_12px_24px_-4px_rgba(0,0,0,0.2),inset_0_1px_2px_rgba(255,255,255,0.2),0_0_24px_-4px_var(--primary)] hover:translate-y-[-2px] active:translate-y-[1px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.25),0_2px_4px_-2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(0,0,0,0.1)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-[transform,background] duration-150"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -80,14 +194,19 @@ export default function PeriodsPage() {
 
       {/* Accounting Periods List */}
       <div className="space-y-4">
-        {periods.length === 0 ? (
+        {isLoadingPeriods ? (
+          <div className="rounded-lg border border-border p-8 text-center">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+            <p className="text-sm text-muted-foreground mt-2">Loading periods...</p>
+          </div>
+        ) : periods.length === 0 ? (
           <div className="rounded-lg border border-border p-8 text-center">
             <Calendar className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
             <p className="font-medium text-foreground mb-1">No accounting periods</p>
             <p className="text-sm text-muted-foreground mb-4">
               Create a new accounting period to get started with claims processing.
             </p>
-            <Button size="sm">
+            <Button size="sm" onClick={() => setShowNewPeriodModal(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create First Period
             </Button>
@@ -139,6 +258,77 @@ export default function PeriodsPage() {
           ))
         )}
       </div>
+      
+      {/* New Period Modal */}
+      <Dialog open={showNewPeriodModal} onOpenChange={setShowNewPeriodModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Accounting Period</DialogTitle>
+            <DialogDescription>
+              Add a new accounting period for {client?.name || 'this company'}.
+              {dbCompany?.companyYearEndMonth && dbCompany?.companyYearEndDay && (
+                <span className="block mt-1 text-xs">
+                  Company year end: {dbCompany.companyYearEndDay}/{dbCompany.companyYearEndMonth}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="startDate">Start Date</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="endDate">End Date (Year End)</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            
+            {createError && (
+              <p className="text-sm text-destructive">{createError}</p>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={resetModal}
+              disabled={isCreating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreatePeriod}
+              disabled={isCreating || !startDate || !endDate}
+            >
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Period
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
