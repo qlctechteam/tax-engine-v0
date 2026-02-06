@@ -1,106 +1,347 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/providers/auth-provider"
 import { useApp } from "@/providers/app-provider"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart"
+import {
+  claimsByCompany,
+  submissionsByCompany,
+  getAllAccountingPeriods,
+} from "@/lib/data"
 import {
   FileText,
   Briefcase,
   Send,
-  ChevronRight,
+  Download,
+  MoreVertical,
+  TrendingUp,
+  TrendingDown,
+  ChevronDown,
 } from "lucide-react"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell } from "recharts"
+
+const barChartConfig = {
+  periods: { label: "Accounting periods", color: "var(--chart-1)" },
+} satisfies ChartConfig
+
+const periodStageColors: Record<string, string> = {
+  "In Progress": "var(--chart-1)",
+  Proofing: "var(--chart-2)",
+  Signed: "var(--chart-3)",
+  Issued: "var(--chart-4)",
+  Submitted: "var(--chart-5)",
+}
 
 export default function HomePage() {
-  const router = useRouter()  
+  const router = useRouter()
   const { clientList } = useApp()
+  const { currentUser } = useAuth()
 
-  // Navigation card component
-  const NavCard = ({ 
-    icon: Icon, 
-    title, 
-    description, 
-    count, 
-    countLabel,
-    onClick 
-  }: { 
-    icon: React.ElementType
-    title: string
-    description: string
-    count?: number
-    countLabel?: string
-    onClick: () => void
-  }) => (
-    <button
-      onClick={onClick}
-      className="group relative flex flex-col p-5 rounded-xl border border-border bg-card text-left transition-all duration-150 hover:border-border/80 hover:bg-muted active:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary transition-colors text-primary-foreground group-hover:text-popover-foreground">
-          <Icon className="h-5 w-5" />
-        </div>
-        {count !== undefined && (
-          <div className="text-right">
-            <p className="text-2xl font-bold text-foreground tabular-nums">{count}</p>
-            <p className="text-xs text-muted-foreground">{countLabel}</p>
-          </div>
-        )}
-      </div>
-      <div className="flex items-center justify-between">
-      <h3 className="text-base font-semibold text-foreground tracking-tight mb-1">{title}</h3>
-      <ChevronRight className="h-4 w-4 text-muted-foreground/50 transition-all duration-150 group-hover:text-muted-foreground group-hover:translate-x-0.5" />
-      </div>
-      <p className="text-sm text-muted-foreground">{description}</p>
-    </button>
+  const firstName = currentUser?.name?.split(/\s+/)[0] ?? "there"
+
+  const dateRangeLabel = useMemo(() => {
+    const end = new Date()
+    const start = new Date()
+    start.setDate(start.getDate() - 31)
+    return `${start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} - ${end.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+  }, [])
+
+  // TaxEngine data: flatten claims, submissions, and get all accounting periods
+  const allClaims = useMemo(
+    () => Object.values(claimsByCompany).flat(),
+    []
+  )
+  const allSubmissions = useMemo(
+    () => Object.values(submissionsByCompany).flat(),
+    []
+  )
+  const allPeriods = useMemo(() => getAllAccountingPeriods(), [])
+
+  const activeRndClaims = useMemo(
+    () => allClaims.filter((c) => c.status === "In progress").length,
+    [allClaims]
+  )
+  const pendingHmrcSubmissions = useMemo(
+    () => allSubmissions.filter((s) => s.status === "Draft").length,
+    [allSubmissions]
+  )
+  const periodsSubmitted = useMemo(
+    () => allPeriods.filter((p) => p.status === "Submitted").length,
+    [allPeriods]
   )
 
+  // Bar chart: accounting periods by year-end (e.g. Mar 2025, Dec 2024)
+  const barData = useMemo(() => {
+    const byYearEnd: Record<string, number> = {}
+    for (const p of allPeriods) {
+      byYearEnd[p.yearEnd] = (byYearEnd[p.yearEnd] ?? 0) + 1
+    }
+    return Object.entries(byYearEnd)
+      .sort(([a], [b]) => {
+        const parse = (s: string) => {
+          const [mon, year] = s.split(" ")
+          const months: Record<string, number> = {
+            Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+            Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+          }
+          return new Date(parseInt(year, 10), months[mon] ?? 0).getTime()
+        }
+        return parse(a) - parse(b)
+      })
+      .map(([yearEnd, count]) => ({ yearEnd, periods: count }))
+  }, [allPeriods])
+
+  // Donut: accounting periods by stage (In Progress, Proofing, Signed, Issued, Submitted), largest first
+  const donutData = useMemo(() => {
+    const statusOrder = ["In Progress", "Proofing", "Signed", "Issued", "Submitted"]
+    const byStatus: Record<string, number> = {}
+    for (const p of allPeriods) {
+      byStatus[p.status] = (byStatus[p.status] ?? 0) + 1
+    }
+    return statusOrder
+      .filter((s) => (byStatus[s] ?? 0) > 0)
+      .map((status) => ({
+        name: status,
+        value: byStatus[status] ?? 0,
+        color: periodStageColors[status] ?? "var(--chart-1)",
+      }))
+      .sort((a, b) => b.value - a.value)
+  }, [allPeriods])
+
+  const donutChartConfig = useMemo(
+    () =>
+      Object.fromEntries(
+        donutData.map((d) => [
+          d.name,
+          { label: d.name, color: d.color },
+        ])
+      ) as ChartConfig,
+    [donutData]
+  )
+
+  const kpis = [
+    {
+      label: "R&D claims in progress",
+      value: activeRndClaims,
+      trend: activeRndClaims > 0 ? 5.2 : 0,
+      trendUp: true,
+      icon: FileText,
+      href: "/claims",
+    },
+    {
+      label: "Clients",
+      value: clientList.length,
+      trend: clientList.length > 0 ? 2.0 : 0,
+      trendUp: true,
+      icon: Briefcase,
+      href: "/companies",
+    },
+    {
+      label: "Pending HMRC submissions",
+      value: pendingHmrcSubmissions,
+      trend: pendingHmrcSubmissions > 0 ? -1.0 : 0,
+      trendUp: false,
+      icon: Send,
+      href: "/submissions",
+    },
+    {
+      label: "CT600 submitted to HMRC",
+      value: periodsSubmitted,
+      trend: periodsSubmitted > 0 ? 8.0 : 0,
+      trendUp: true,
+      icon: FileText,
+      href: "/submissions",
+    },
+  ]
+
   return (
-    <div className="container mx-auto p-6 lg:p-8">
-      {/* Page Header */}
-      <div className="mb-10 text-center">
-        <h1 className="text-3xl font-bold text-foreground tracking-tight mb-2">TaxEngine</h1>
-        <p className="text-muted-foreground">R&D Tax Credit Infrastructure</p>
-      </div>
+    <div className="min-h-screen bg-[#F9FAFB] dark:bg-background">
+      <div className="container mx-auto p-6 lg:p-8 space-y-6">
+        {/* Header: Welcome + actions */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Welcome back, {firstName}
+          </h1>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-border bg-card shadow-sm"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download R&D report
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-border bg-card shadow-sm min-w-[140px] justify-between"
+            >
+              <span className="text-muted-foreground">{dateRangeLabel}</span>
+              <ChevronDown className="h-4 w-4 ml-2 text-muted-foreground" />
+            </Button>
+          </div>
+        </div>
 
-      {/* Primary CTA - Start Claim */}
-      <div className="mb-12 flex justify-center">
-        <Button
-          size="lg"
-          className="group h-12 px-8 text-base tracking-tight text-primary-foreground font-bold rounded-xl border-t border-t-white/20 border-b-2 border-b-black/15 border-x border-x-white/10 bg-gradient-to-b from-primary/90 to-primary animate-cta-breathe hover:from-primary/80 hover:to-primary hover:shadow-[0_4px_0_0_rgba(0,0,0,0.15),0_6px_12px_-2px_rgba(0,0,0,0.3),0_12px_24px_-4px_rgba(0,0,0,0.2),inset_0_1px_2px_rgba(255,255,255,0.2),0_0_24px_-4px_var(--primary)] hover:translate-y-[-2px] active:translate-y-[1px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.25),0_2px_4px_-2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(0,0,0,0.1)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-[transform,background] duration-150"
-          onClick={() => router.push("/claims")}
-        >
-          <span>Start Claim</span>
-          <ChevronRight className="h-5 w-5 ml-2 transition-transform duration-150 group-hover:translate-x-0.5" />
-        </Button>
-      </div>
+        {/* KPI cards - 2x4 grid style (2 rows, 4 cols) */}
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          {kpis.map(({ label, value, trend, trendUp, icon: Icon, href }) => (
+            <Card
+              key={label}
+              className="bg-card border-border shadow-[var(--shadow-elevation-low)] rounded-xl overflow-hidden cursor-pointer transition-shadow hover:shadow-[var(--shadow-elevation-medium)]"
+              onClick={() => router.push(href)}
+            >
+              <CardHeader className="pb-1 pt-4 px-4 flex flex-row items-start justify-between space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {label}
+                </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <button className="rounded p-1 hover:bg-muted">
+                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                      View all
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                      Export
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <CardContent className="px-4 pb-4 pt-0">
+                <p className="text-2xl font-bold tabular-nums text-foreground">{value}</p>
+                {trend !== 0 ? (
+                  <div className="flex items-center gap-1 mt-2">
+                    {trendUp ? (
+                      <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+                    ) : (
+                      <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+                    )}
+                    <span
+                      className={`text-xs font-medium ${
+                        trendUp ? "text-emerald-600" : "text-red-500"
+                      }`}
+                    >
+                      {trendUp ? "+" : ""}
+                      {trend}%
+                    </span>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-      {/* Navigation Cards */}
-      <div className="grid sm:grid-cols-3 gap-4">
-        <NavCard
-          icon={FileText}
-          title="Claims"
-          description="Process and manage R&D claims"
-          count={7}
-          countLabel="active"
-          onClick={() => router.push("/claims")}
-        />
-        <NavCard
-          icon={Briefcase}
-          title="Clients"
-          description="View and manage client records"
-          count={clientList.length}
-          countLabel="total"
-          onClick={() => router.push("/companies")}
-        />
-        <NavCard
-          icon={Send}
-          title="Submissions"
-          description="Track HMRC submissions"
-          count={3}
-          countLabel="pending"
-          onClick={() => router.push("/submissions")}
-        />
+        {/* Bottom: Bar chart (left) + Donut (right) */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* R&D / CT600 activity by accounting period */}
+          <Card className="lg:col-span-2 bg-card border-border shadow-[var(--shadow-elevation-low)] rounded-xl">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg font-semibold text-foreground">
+                    R&D accounting periods
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Total: {allPeriods.length} periods across clients
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" className="border-border bg-card shadow-sm">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download R&D report
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={barChartConfig} className="h-[280px] w-full">
+                <BarChart data={barData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                  <XAxis dataKey="yearEnd" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+                  <YAxis tickLine={false} axisLine={false} width={28} tick={{ fontSize: 11 }} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="periods" fill="var(--color-periods)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+
+          {/* Accounting periods by stage (CT600 pipeline) */}
+          <Card className="bg-card border-border shadow-[var(--shadow-elevation-low)] rounded-xl">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-semibold text-foreground">
+                  Periods by stage
+                </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="rounded p-1 hover:bg-muted">
+                      <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => router.push("/companies")}>
+                      View clients
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>Export</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center">
+              <ChartContainer config={donutChartConfig} className="h-[220px] w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Pie
+                    data={donutData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={60}
+                    outerRadius={85}
+                    paddingAngle={2}
+                    strokeWidth={0}
+                  >
+                    {donutData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ChartContainer>
+              <div className="flex flex-wrap justify-center gap-4 mt-2">
+                {donutData.map((item) => (
+                  <div key={item.name} className="flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-sm text-muted-foreground">{item.name}</span>
+                  </div>
+                ))}
+              </div>
+              {donutData.length > 0 && (
+                <p className="text-center text-lg font-bold text-foreground mt-2">
+                  {donutData[0].name} {donutData[0].value}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

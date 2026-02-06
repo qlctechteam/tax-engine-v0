@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Dialog,
@@ -221,10 +221,11 @@ export default function CompaniesPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 lg:p-8">
-      {/* Header with actions */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Clients</h1>
+    <div className="min-h-screen bg-[#F9FAFB] dark:bg-background">
+      <div className="container mx-auto p-6 lg:p-8 space-y-6">
+        {/* Header with actions */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Clients</h1>
         <div className="flex gap-2">
           {/* CSV Upload Dialog */}
           <Dialog open={csvUploadOpen} onOpenChange={setCsvUploadOpen}>
@@ -339,10 +340,7 @@ export default function CompaniesPage() {
             if (!open) resetNewClientForm()
           }}>
             <DialogTrigger asChild>
-              <Button
-                size="sm"
-                className="group h-9 px-4 text-sm tracking-tight text-primary-foreground font-semibold rounded-lg border-t border-t-white/20 border-b-2 border-b-black/15 border-x border-x-white/10 bg-gradient-to-b from-primary/90 to-primary animate-cta-breathe hover:from-primary/80 hover:to-primary hover:shadow-[0_4px_0_0_rgba(0,0,0,0.15),0_6px_12px_-2px_rgba(0,0,0,0.3),0_12px_24px_-4px_rgba(0,0,0,0.2),inset_0_1px_2px_rgba(255,255,255,0.2),0_0_24px_-4px_var(--primary)] hover:translate-y-[-2px] active:translate-y-[1px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.25),0_2px_4px_-2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(0,0,0,0.1)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-[transform,background] duration-150"
-              >
+              <Button size="sm" className="group h-9 px-4 text-sm tracking-tight font-semibold rounded-lg">
                 <Plus className="h-4 w-4 mr-2" />
                 New Client
               </Button>
@@ -497,77 +495,31 @@ export default function CompaniesPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </div>
-
-      {/* Primary: Search Input */}
-      <div className="relative mb-6">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground z-10" />
-        <Input
-          placeholder="Search by company name or number..."
-          className="pl-12 h-12 text-base shadow-[var(--shadow-elevation-medium)] focus-visible:shadow-[var(--shadow-elevation-high)]"
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value)
-            if (e.target.value) setSelectedLetter(null)
-          }}
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery("")}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-
-      {/* Secondary: A-Z Tabs */}
-      <div className="mb-6">
-        <div className="flex flex-wrap gap-1">
-          <button
-            onClick={() => {
-              setSelectedLetter(null)
-              setSearchQuery("")
-            }}
-            className={cn(
-              "px-2.5 py-1 text-xs font-medium rounded transition-colors",
-              !selectedLetter && !searchQuery
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted"
-            )}
-          >
-            All
-          </button>
-          {alphabet.map((letter) => {
-            const hasClients = (grouped[letter]?.length || 0) > 0
-            return (
-              <button
-                key={letter}
-                onClick={() => {
-                  if (hasClients) {
-                    setSelectedLetter(letter)
-                    setSearchQuery("")
-                  }
-                }}
-                disabled={!hasClients}
-                className={cn(
-                  "px-2.5 py-1 text-xs font-medium rounded transition-colors",
-                  selectedLetter === letter
-                    ? "bg-primary text-primary-foreground"
-                    : hasClients
-                    ? "text-muted-foreground hover:bg-muted"
-                    : "text-muted-foreground/30 cursor-not-allowed"
-                )}
-              >
-                {letter}
-              </button>
-            )
-          })}
         </div>
-      </div>
 
-      {/* Results count */}
-      <div className="mb-4">
+        {/* Search - on page, not in a card */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground z-10" />
+          <Input
+            placeholder="Search by company name or number..."
+            className="pl-10 h-11 max-w-md"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              if (e.target.value) setSelectedLetter(null)
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Results count - on page, not in a card */}
         <p className="text-sm text-muted-foreground">
           {searchQuery
             ? `${filteredClients.length} result${filteredClients.length !== 1 ? "s" : ""} for "${searchQuery}"`
@@ -575,38 +527,93 @@ export default function CompaniesPage() {
             ? `${filteredClients.length} client${filteredClients.length !== 1 ? "s" : ""} starting with "${selectedLetter}"`
             : `${clientList.length} clients`}
         </p>
-      </div>
 
-      {/* Client List */}
-      <div className="rounded-lg border border-border overflow-hidden">
-        {filteredClients.length === 0 ? (
-          <div className="p-8 text-center">
-            <Building2 className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-            <p className="font-medium text-foreground">No clients found</p>
-            <p className="text-sm text-muted-foreground">
-              {searchQuery ? "Try a different search term" : "Add a client to get started"}
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {filteredClients.map((client) => (
+        {/* Card: Filter (A–Z only) */}
+        <Card className="bg-card border-border shadow-[var(--shadow-elevation-low)] rounded-xl overflow-hidden">
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-1">
               <button
-                key={client.id}
-                onClick={() => handleClientClick(client)}
-                className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-muted/50 transition-colors"
+                onClick={() => {
+                  setSelectedLetter(null)
+                  setSearchQuery("")
+                }}
+                className={cn(
+                  "px-2.5 py-1 text-xs font-medium rounded transition-colors",
+                  !selectedLetter && !searchQuery
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted"
+                )}
               >
-                <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground flex-shrink-0">
-                  {client.name.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate leading-tight">{client.name}</p>
-                  <p className="text-sm text-muted-foreground leading-tight">{client.number}</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                All
               </button>
-            ))}
-          </div>
-        )}
+              {alphabet.map((letter) => {
+                const hasClients = (grouped[letter]?.length || 0) > 0
+                return (
+                  <button
+                    key={letter}
+                    onClick={() => {
+                      if (hasClients) {
+                        setSelectedLetter(letter)
+                        setSearchQuery("")
+                      }
+                    }}
+                    disabled={!hasClients}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium rounded transition-colors",
+                      selectedLetter === letter
+                        ? "bg-primary text-primary-foreground"
+                        : hasClients
+                        ? "text-muted-foreground hover:bg-muted"
+                        : "text-muted-foreground/30 cursor-not-allowed"
+                    )}
+                  >
+                    {letter}
+                  </button>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Companies list */}
+        <Card className="bg-card border-border shadow-[var(--shadow-elevation-low)] rounded-xl overflow-hidden pt-0 pb-0">
+          <CardContent className="p-0">
+            {/* Header row as top of card */}
+            <div className="grid grid-cols-[auto_1fr_auto] gap-4 px-6 py-3 bg-muted/30 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide rounded-t-xl">
+              <span className="w-8" aria-hidden />
+              <span>Company</span>
+              <span className="w-4" aria-hidden />
+            </div>
+            {filteredClients.length === 0 ? (
+              <div className="p-8 text-center">
+                <Building2 className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="font-medium text-foreground">No clients found</p>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? "Try a different search term" : "Add a client to get started"}
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {filteredClients.map((client) => (
+                  <button
+                    key={client.id}
+                    onClick={() => handleClientClick(client)}
+                    className="w-full flex items-center gap-3 px-6 py-3 text-left hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground flex-shrink-0">
+                      {client.name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground truncate leading-tight">{client.name}</p>
+                      <p className="text-sm text-muted-foreground leading-tight">{client.number}</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

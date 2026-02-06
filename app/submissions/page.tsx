@@ -80,20 +80,16 @@ export default function SubmissionsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 lg:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Submissions</h1>
-        {/* Primary CTA - Start Submission */}
-        <div>
+    <div className="min-h-screen bg-[#F9FAFB] dark:bg-background">
+      <div className="container mx-auto p-6 lg:p-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Submissions</h1>
           <Dialog open={startSubmissionOpen} onOpenChange={(open) => {
             setStartSubmissionOpen(open)
             if (!open) setSearchQuery("")
           }}>
             <DialogTrigger asChild>
-              <Button
-                size="sm"
-                className="group h-9 px-4 text-sm tracking-tight text-primary-foreground font-semibold rounded-lg border-t border-t-white/20 border-b-2 border-b-black/15 border-x border-x-white/10 bg-gradient-to-b from-primary/90 to-primary animate-cta-breathe hover:from-primary/80 hover:to-primary hover:shadow-[0_4px_0_0_rgba(0,0,0,0.15),0_6px_12px_-2px_rgba(0,0,0,0.3),0_12px_24px_-4px_rgba(0,0,0,0.2),inset_0_1px_2px_rgba(255,255,255,0.2),0_0_24px_-4px_var(--primary)] hover:translate-y-[-2px] active:translate-y-[1px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.25),0_2px_4px_-2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(0,0,0,0.1)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-[transform,background] duration-150"
-              >
+              <Button size="sm" className="group h-9 px-4 text-sm tracking-tight font-semibold rounded-lg">
                 <span>Start Submission</span>
                 <ChevronRight className="h-5 w-5 ml-2 transition-transform duration-150 group-hover:translate-x-0.5" />
               </Button>
@@ -154,31 +150,28 @@ export default function SubmissionsPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </div>
-      {/* Submitted Claims Table */}
-      <div>
-        <h3 className="text-sm font-medium text-muted-foreground mb-4">Submitted Claims</h3>
-        
-        <div className="rounded-lg border border-border overflow-hidden">
+
+        <h2 className="text-lg font-semibold text-foreground">Submitted claims</h2>
+
+        {/* White card - table header is top of card */}
+        <div className="bg-card border border-border shadow-[var(--shadow-elevation-low)] rounded-xl overflow-hidden pt-0 pb-0">
           {/* Table Header */}
-          <div className="grid grid-cols-[1fr_1fr_120px_100px_80px] gap-4 px-4 py-3 bg-muted/30 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <div className="grid grid-cols-[1fr_1fr_120px_100px_80px] gap-4 px-6 py-3 bg-muted/30 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide rounded-t-xl">
             <span>Company</span>
             <span>Claim</span>
             <span>Date Submitted</span>
             <span>Status</span>
             <span className="text-center">Receipt</span>
           </div>
-          
+
           {/* Table Rows */}
           <div className="divide-y divide-border">
             {submittedClaims.map((claim) => {
-              // Find matching client for navigation
               const matchingClient = clientList?.find(c => c.name === claim.company)
-              
               return (
                 <div
                   key={claim.id}
-                  className="grid grid-cols-[1fr_1fr_120px_100px_80px] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors"
+                  className="grid grid-cols-[1fr_1fr_120px_100px_80px] gap-4 px-6 py-3 items-center hover:bg-muted/30 transition-colors"
                 >
                   <div className="min-w-0">
                     <button

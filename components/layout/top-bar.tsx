@@ -51,7 +51,7 @@ export function TopBar({
   const unreadCount = notifications.filter(n => !n.read).length
 
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-30 h-16 border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex items-center justify-between gap-4 h-full px-4 lg:px-6">
         <div className="relative flex-1 max-w-xl">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />

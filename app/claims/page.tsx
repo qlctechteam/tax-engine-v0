@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Dialog,
@@ -81,22 +82,21 @@ export default function ClaimsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 lg:p-8">
-      <div className="flex items-center justify-between mb-6">
-      <h1 className="text-2xl font-bold text-foreground">Claims</h1>
-      {/* Primary CTA - Start Claim */}
-      <div>
-        <Dialog open={startClaimOpen} onOpenChange={setStartClaimOpen}>
-          <DialogTrigger asChild>
-            <Button
-              size="sm"
-              className="group h-9 px-4 text-sm tracking-tight text-primary-foreground font-semibold rounded-lg border-t border-t-white/20 border-b-2 border-b-black/15 border-x border-x-white/10 bg-gradient-to-b from-primary/90 to-primary animate-cta-breathe hover:from-primary/80 hover:to-primary hover:shadow-[0_4px_0_0_rgba(0,0,0,0.15),0_6px_12px_-2px_rgba(0,0,0,0.3),0_12px_24px_-4px_rgba(0,0,0,0.2),inset_0_1px_2px_rgba(255,255,255,0.2),0_0_24px_-4px_var(--primary)] hover:translate-y-[-2px] active:translate-y-[1px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.25),0_2px_4px_-2px_rgba(0,0,0,0.15),inset_0_1px_2px_rgba(0,0,0,0.1)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-[transform,background] duration-150"
-              onClick={handleStartClaim}
-            >
-              <span>Start New Claim</span>
-              <ChevronRight className="h-5 w-5 ml-2 transition-transform duration-150 group-hover:translate-x-0.5" />
-            </Button>
-          </DialogTrigger>
+    <div className="min-h-screen bg-[#F9FAFB] dark:bg-background">
+      <div className="container mx-auto p-6 lg:p-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Claims</h1>
+          <Dialog open={startClaimOpen} onOpenChange={setStartClaimOpen}>
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                className="group h-9 px-4 text-sm tracking-tight text-primary-foreground font-semibold rounded-lg"
+                onClick={handleStartClaim}
+              >
+                <span>Start New Claim</span>
+                <ChevronRight className="h-5 w-5 ml-2 transition-transform duration-150 group-hover:translate-x-0.5" />
+              </Button>
+            </DialogTrigger>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>
@@ -206,61 +206,65 @@ export default function ClaimsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-      </div>
-      {/* Recent Claims Table */}
-      <div>
-        <h3 className="text-sm font-medium text-muted-foreground mb-4">Recent Claims</h3>
-
-        {/* Desktop: table layout */}
-        <div className="hidden md:block rounded-lg border border-border overflow-hidden">
-          <div className="grid grid-cols-[1fr_140px_100px_100px] gap-4 px-4 py-3 bg-muted/30 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            <span>Company</span>
-            <span>Processed by</span>
-            <span>Year end</span>
-            <span>Status</span>
-          </div>
-          <div className="divide-y divide-border">
-            {recentClaims.map((claim) => (
-              <button
-                key={claim.id}
-                onClick={() => router.push(`/companies/${claim.companyId}/periods/${claim.id}`)}
-                className="w-full grid grid-cols-[1fr_140px_100px_100px] gap-4 px-4 py-3 items-center hover:bg-muted/30 transition-colors cursor-pointer text-left"
-              >
-                <span className="font-medium text-foreground truncate">{claim.companyName}</span>
-                <span className="text-sm text-muted-foreground truncate">{claim.processedBy || "-"}</span>
-                <span className="text-sm text-muted-foreground">{claim.yearEnd}</span>
-                <Badge variant="outline" className={cn("w-fit text-xs", getStatusBadge(claim.status))}>
-                  {claim.status}
-                </Badge>
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* Mobile: stacked layout with company, processed by + date, status right */}
-        <div className="md:hidden rounded-lg border border-border overflow-hidden divide-y divide-border">
-          {recentClaims.map((claim) => (
-            <button
-              key={claim.id}
-              onClick={() => router.push(`/companies/${claim.companyId}/periods/${claim.id}`)}
-              className="w-full px-4 py-3 flex flex-col gap-1 hover:bg-muted/30 transition-colors cursor-pointer text-left"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <span className="font-medium text-foreground flex-1 min-w-0 truncate">{claim.companyName}</span>
-                <Badge variant="outline" className={cn("shrink-0 text-xs", getStatusBadge(claim.status))}>
-                  {claim.status}
-                </Badge>
+        {/* Recent Claims - header above card */}
+        <h2 className="text-lg font-semibold text-foreground">Recent claims</h2>
+
+        {/* White card - table header is top of card */}
+        <Card className="bg-card border-border shadow-[var(--shadow-elevation-low)] rounded-xl overflow-hidden pt-0 pb-0">
+          <CardContent className="p-0">
+            {/* Desktop: table layout */}
+            <div className="hidden md:block">
+              <div className="grid grid-cols-[1fr_140px_100px_100px] gap-4 px-6 py-3 bg-muted/30 border-b border-border text-xs font-medium text-muted-foreground uppercase tracking-wide rounded-t-xl">
+                <span>Company</span>
+                <span>Processed by</span>
+                <span>Year end</span>
+                <span>Status</span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Processed by: {claim.processedBy || "—"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Year End: {claim.yearEnd}
-              </p>
-            </button>
-          ))}
-        </div>
+              <div className="divide-y divide-border">
+                {recentClaims.map((claim) => (
+                  <button
+                    key={claim.id}
+                    onClick={() => router.push(`/companies/${claim.companyId}/periods/${claim.id}`)}
+                    className="w-full grid grid-cols-[1fr_140px_100px_100px] gap-4 px-6 py-3 items-center hover:bg-muted/30 transition-colors cursor-pointer text-left"
+                  >
+                    <span className="font-medium text-foreground truncate">{claim.companyName}</span>
+                    <span className="text-sm text-muted-foreground truncate">{claim.processedBy || "-"}</span>
+                    <span className="text-sm text-muted-foreground">{claim.yearEnd}</span>
+                    <Badge variant="outline" className={cn("w-fit text-xs", getStatusBadge(claim.status))}>
+                      {claim.status}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mobile: stacked layout */}
+            <div className="md:hidden divide-y divide-border">
+              {recentClaims.map((claim) => (
+                <button
+                  key={claim.id}
+                  onClick={() => router.push(`/companies/${claim.companyId}/periods/${claim.id}`)}
+                  className="w-full px-6 py-3 flex flex-col gap-1 hover:bg-muted/30 transition-colors cursor-pointer text-left"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="font-medium text-foreground flex-1 min-w-0 truncate">{claim.companyName}</span>
+                    <Badge variant="outline" className={cn("shrink-0 text-xs", getStatusBadge(claim.status))}>
+                      {claim.status}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Processed by: {claim.processedBy || "—"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Year End: {claim.yearEnd}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
